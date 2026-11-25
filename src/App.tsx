@@ -14,7 +14,7 @@ export default function App() {
  const input=useRef<HTMLInputElement>(null);
  const rows:DataRow[]=saved.rows || [];
  const stations=useMemo(()=>calculateDemand(buildStations(rows)),[rows]);
- const total=(key:string)=>stations.reduce((sum:any,s:any)=>sum+(Number(s[key])||0),0);
+ const total=(key:string)=>stations.reduce((sum:any,s:any)=>sum+(Number((s as any)[key])||0),0);
  const metrics={blocks:rows.length,stations:stations.length,tehsils:new Set(rows.map(r=>String(r.Tehsil||"").trim()).filter(Boolean)).size,demand:total("totalDemand")};
  function persist(next:any){setSaved(next);localStorage.setItem(STORAGE,JSON.stringify(next));}
  async function importFile(file?:File){
