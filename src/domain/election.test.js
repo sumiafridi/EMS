@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildStations, calculateDemand } from "./election.js";
+import { buildStations, calculateDemand } from "./election.ts";
 
 const row = (overrides = {}) => ({
   District: "Kohat", Tehsil: "Kohat", "Council Type (NC / VC)": "NC",
