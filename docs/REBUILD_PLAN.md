@@ -9,7 +9,9 @@ Rebuild the existing KPK Local Government Election Management System as a mainta
 - Completed: confirmed authoritative Kohat backup; live Kohat snapshot marked stale/incomplete and retained for recovery.
 - Completed: source audit of the legacy HTML application, including station aggregation, demand formulas, assignment priority, training generation, imports and backup restore behavior.
 - Added: typed election domain foundation in `src/domain/election.ts`, with fixtures for station aggregation and Male/Female/Combined demand; Node 22 CI workflow runs these tests.
-- Not yet complete: full React application shell, authentication screens, normalized data repositories, transactional import/migration, role-tested RLS, remaining staffing/training/forms modules, end-to-end tests and GitHub Pages deployment.
+- Added (25 November 2026): Vite + React application shell, responsive district workspace, Excel/CSV DATA import, local browser persistence, polling-station register, demand summary, and JSON backup export.
+- Added: GitHub Pages build/deploy workflow. Deployment still needs a successful Actions run and Pages configuration verification.
+- Not yet complete: cloud authentication, normalized data repositories, transactional import/migration, role-tested RLS, staff roster/allocation, demand-first training, attendance, forms/reports, end-to-end tests and production data migration.
 - No production data migration or destructive database changes have been made.
 
 ## Existing application baseline
