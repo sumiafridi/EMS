@@ -653,7 +653,7 @@ export default function App(){
    if(!parsed.length)throw new Error("No DATA rows found in any worksheet.");
    const headers=Object.keys(parsed[0]),missing=required.filter(x=>!headers.includes(x));if(missing.length)throw new Error("The selected worksheet '"+selectedSheet+"' is missing key headings: "+missing.join(", ")+". Download the official DATA template and map these columns.");
    const sourceDistricts=[...new Set(parsed.map((r:any)=>String(r.District||"").trim()).filter(Boolean))];if(sourceDistricts.length>1)throw new Error("This DATA workbook contains multiple districts ("+sourceDistricts.join(", ")+"). Upload one district at a time.");if(sourceDistricts.length===1&&norm(sourceDistricts[0])!==norm(activeDistrict?.name))throw new Error("The workbook belongs to "+sourceDistricts[0]+", but the selected district is "+(activeDistrict?.name||"unknown")+". Select the matching district before importing.");
-   const errors:string[]=[],valid:DataRow[]=[],seenAllocations=new Set<string>(),stationMeta=new Map<string,string>();
+   const errors:string[]=[],valid:DataRow[]=[],seenAllocations=new Set<string>(),stationMeta=new Map<string,string>(),blockSegments=new Map<string,{segment:string;stationKey:string}>();
    const normValue=(v:any)=>String(v??"").trim().toLowerCase();
    parsed.forEach((r:any,i:number)=>{
     const rowNo=headerRow+i+1,issuesForRow:string[]=[];
@@ -664,7 +664,9 @@ export default function App(){
     const stationKey=[normValue(tehsil),cType,normValue(cNo),normValue(psNo)].join("|"),stationDesc=[psName,psType].join("|");
     if(stationKey&&stationMeta.has(stationKey)&&stationMeta.get(stationKey)!==stationDesc)issuesForRow.push("The same station number has conflicting name/type values in this workbook");
     else if(stationKey)stationMeta.set(stationKey,stationDesc);
-    const allocationKey=stationKey+"|"+normValue(block);
+    const allocationKey=stationKey+"|"+normValue(block),blockKey=normValue(tehsil)+"|"+normValue(block),previousSegment=blockSegments.get(blockKey);
+    if(previousSegment&&(psType==="Combined"||previousSegment.segment==="Combined"||(previousSegment.segment===psType&&previousSegment.stationKey!==stationKey)))issuesForRow.push("This census block conflicts with another allocation: allow one Male and one Female segment, but Combined cannot coexist with either and the same gender cannot be assigned to two stations.");
+    if(!previousSegment&&blockKey)blockSegments.set(blockKey,{segment:psType,stationKey});
     if(allocationKey&&seenAllocations.has(allocationKey))issuesForRow.push("Duplicate block-to-station row in this workbook");
     if(allocationKey)seenAllocations.add(allocationKey);
     if(issuesForRow.length)errors.push("Excel row "+rowNo+": "+issuesForRow.join("; "));
