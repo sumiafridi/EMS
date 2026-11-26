@@ -600,7 +600,7 @@ export default function App(){
    const morningStart=time("morning_start",planData.morning_start||"09:00"),morningEnd=time("morning_end",planData.morning_end||"12:00");
    const eveningStart=time("evening_start",planData.evening_start||"14:00"),eveningEnd=time("evening_end",planData.evening_end||"17:00");
    const batchStart:number[]=[];
-   const venueRows=venueRecords.filter(v=>{const g=String(v.gender_group||v.source_data?.gender||"").toLowerCase();return (g==="male"||g==="female")&&String(v.availability??v.source_data?.availability??"yes").toLowerCase()!=="no";});
+   const venueRows=venueRecords.filter(v=>{const g=String(v.gender_group||v.source_data?.gender||"").toLowerCase();return (g==="male"||g==="female")&&String(v.availability??v.source_data?.availability??"yes").toLowerCase()!=="no"&&Number(v.capacity)>0&&!!String(v.classroom||v.source_data?.classroom||"").trim();});
    let batchNumber=0;
    for(const gender of ["Male","Female"]){
     const g=gender.toLowerCase();
@@ -955,7 +955,7 @@ export default function App(){
   const invalidMobile=staffRecords.filter(r=>{const d=val(r,"mobile","Mobile #").replace(/\D/g,"");return d.length>0&&!(d.length===11&&d.startsWith("03"));}).length;
   const trainerMale=trainerRecords.filter(r=>val(r,"gender","Gender").toLowerCase()==="male").length;
   const trainerFemale=trainerRecords.filter(r=>val(r,"gender","Gender").toLowerCase()==="female").length;
-  const availableVenues=venueRecords.filter(r=>["yes","y","available","true","1"].includes(String(r.availability??r.source_data?.availability??r.source_data?.["Availability (Yes/No)"]??"Yes").toLowerCase()));
+  const availableVenues=venueRecords.filter(r=>["yes","y","available","true","1"].includes(String(r.availability??r.source_data?.availability??r.source_data?.["Availability (Yes/No)"]??"Yes").toLowerCase())&&Number(r.capacity)>0&&!!String(r.classroom||r.source_data?.classroom||"").trim()&&["male","female"].includes(String(r.gender_group??r.source_data?.gender??r.source_data?.Gender??"").toLowerCase()));
   const venueMale=availableVenues.filter(r=>String(r.gender_group??r.source_data?.gender??r.source_data?.Gender??"").toLowerCase()==="male").length;
   const venueFemale=availableVenues.filter(r=>String(r.gender_group??r.source_data?.gender??r.source_data?.Gender??"").toLowerCase()==="female").length;
   const venueCapacity=availableVenues.reduce((n,r)=>n+Number(r.capacity||0),0);
