@@ -600,7 +600,7 @@ export default function App(){
    const apoMin=settingNumber("apo_min_bps",7),apoMax=settingNumber("apo_max_bps",15),poMin=settingNumber("po_min_bps",7),poMax=settingNumber("po_max_bps",15);
    const allowSeniorSurplus=String(settingsDraft["allocation:allow_senior_surplus_to_junior"]??"true").toLowerCase()==="true";
    const homeTehsilFirst=String(settingsDraft["allocation:home_tehsil_first"]??"true").toLowerCase()==="true";
-   const seniorPool=eligible.filter((r:any)=>r.bps>=Math.min(presMin,seniorApoMin));
+   const seniorPool=eligible.filter((r:any)=>r.bps>=Math.max(presMin,seniorApoMin));
    const presPool=eligible.filter((r:any)=>r.bps>=presMin),seniorApoPool=eligible.filter((r:any)=>r.bps>=seniorApoMin);
    const apoPool=eligible.filter((r:any)=>r.bps>=apoMin&&r.bps<=apoMax),poPool=eligible.filter((r:any)=>r.bps>=poMin&&r.bps<=poMax);
    for(const pool of [seniorPool,presPool,seniorApoPool,apoPool,poPool])pool.sort((a:any,b:any)=>b.bps-a.bps);
@@ -687,7 +687,7 @@ export default function App(){
    const cap=Number(isPres?(trainingDraft.pres_batch_size||plan.plan_data?.pres_batch_size||plan.batch_capacity||25):apoPoCap);
    const duration=Number(isPres?(trainingDraft.pres_duration_days||plan.plan_data?.pres_duration_days||plan.duration_days||1):Math.max(Number(trainingDraft.apo_duration_days||plan.plan_data?.apo_duration_days||plan.duration_days||1),Number(trainingDraft.po_duration_days||plan.plan_data?.po_duration_days||plan.duration_days||1)));
    const autoApoStart=String(trainingDraft.apo_start_mode||"auto").toLowerCase()==="auto"&&presEndForAuto?nextWorkingDate(presEndForAuto):"";
-   const start=String(trainingDraft[isPres?"pres_start_date":"apo_start_date"]||(!isPres?autoApoStart:"")||plan.start_date||"");
+   const start=String(isPres?(trainingDraft.pres_start_date||plan.start_date||""):(autoApoStart||trainingDraft.apo_start_date||plan.start_date||""));
    const end=String(trainingDraft[isPres?"pres_end_date":"apo_end_date"]||plan.end_date||"");
    if(!start||!end||!Number.isInteger(cap)||cap<1||!Number.isInteger(duration)||duration<1)throw new Error(roleGroup+" has invalid date, capacity or duration settings.");
    const planData=plan.plan_data||{};
@@ -943,14 +943,15 @@ export default function App(){
   const poSize=value("po_batch_size")||apoSize;
   const combinedApoPoSize=Math.min(apoSize,poSize);
   const role=(roleName:string,gender:"Male"|"Female")=>reserveSummary.categories.find(x=>x.role===roleName&&x.gender===gender)?.training||0;
+  const roomCapacity=(gender:"Male"|"Female",configured:number)=>{const caps=venueRecords.filter(v=>String(v.gender_group||v.source_data?.gender||v.source_data?.Gender||"").toLowerCase()===gender.toLowerCase()&&["yes","y","available","true","1"].includes(String(v.availability??v.source_data?.availability??v.source_data?.["Availability (Yes/No)"]??"yes").toLowerCase())&&Number(v.capacity)>0&&String(v.classroom||v.source_data?.classroom||v.source_data?.["Classroom Name/No."]||"").trim()).map(v=>Number(v.capacity));return caps.length?Math.min(configured,...caps):configured;};
   const groups=[
-   {group:"Presiding / Senior APO",gender:"Male" as const,seats:role("Presiding Officer","Male")+role("Senior APO","Male"),size:presSize},
-   {group:"Presiding / Senior APO",gender:"Female" as const,seats:role("Presiding Officer","Female")+role("Senior APO","Female"),size:presSize},
-   {group:"APO + PO combined",gender:"Male" as const,seats:role("APO","Male")+role("PO","Male"),size:combinedApoPoSize},
-   {group:"APO + PO combined",gender:"Female" as const,seats:role("APO","Female")+role("PO","Female"),size:combinedApoPoSize}
+   {group:"Presiding / Senior APO",gender:"Male" as const,seats:role("Presiding Officer","Male")+role("Senior APO","Male"),size:roomCapacity("Male",presSize)},
+   {group:"Presiding / Senior APO",gender:"Female" as const,seats:role("Presiding Officer","Female")+role("Senior APO","Female"),size:roomCapacity("Female",presSize)},
+   {group:"APO + PO combined",gender:"Male" as const,seats:role("APO","Male")+role("PO","Male"),size:roomCapacity("Male",combinedApoPoSize)},
+   {group:"APO + PO combined",gender:"Female" as const,seats:role("APO","Female")+role("PO","Female"),size:roomCapacity("Female",combinedApoPoSize)}
   ].map(x=>({...x,batches:Math.ceil(x.seats/x.size)}));
   return {groups,presBatchSize:presSize,apoBatchSize:combinedApoPoSize,poBatchSize:poSize,totalSeats:groups.reduce((n,x)=>n+x.seats,0),totalBatches:groups.reduce((n,x)=>n+x.batches,0),parallelDays:Math.max(groups[0].batches,groups[1].batches)+Math.max(groups[2].batches,groups[3].batches)};
- },[trainingDraft,reserveSummary]);
+ },[trainingDraft,reserveSummary,venueRecords]);
  const staffSupply=useMemo(()=>{
   const read=(r:any,...keys:string[])=>{for(const k of keys){const v=r?.[k]??r?.source_data?.[k];if(v!==undefined&&v!==null&&String(v).trim()!=="")return String(v).trim();}return "";};
   const rows=["Male","Female"].flatMap(g=>["BPS 16+","BPS 7–15","Other / unclassified"].map(group=>{
