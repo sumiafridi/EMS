@@ -10,6 +10,8 @@ const chunkSize=20;
 
 export default function App(){
  const [session,setSession]=useState<any>(null),[email,setEmail]=useState(""),[districts,setDistricts]=useState<District[]>([]),[districtId,setDistrictId]=useState(""),[section,setSection]=useState("Overview");
+ const [isGlobalAdmin,setIsGlobalAdmin]=useState(false),[globalSettings,setGlobalSettings]=useState<any[]>([]),[globalSettingsDraft,setGlobalSettingsDraft]=useState<Record<string,{value:string;locked:boolean}>>({}),[newGlobalKey,setNewGlobalKey]=useState(""),[newGlobalValue,setNewGlobalValue]=useState("");
+ const [districtSettingKeys,setDistrictSettingKeys]=useState<string[]>([]);
  const [rows,setRows]=useState<DataRow[]>([]),[stations,setStations]=useState<StationRow[]>([]),[counts,setCounts]=useState({tehsils:0,stations:0,blocks:0,allocations:0,allocatedBlocks:0,linkedStations:0}),[opsCounts,setOpsCounts]=useState({staff:0,trainers:0,venues:0,rules:0,plans:0,settings:0,assignments:0,reserves:0,batches:0,participants:0,attendance:0});
  const [staffRecords,setStaffRecords]=useState<any[]>([]),[trainerRecords,setTrainerRecords]=useState<any[]>([]),[venueRecords,setVenueRecords]=useState<any[]>([]),[assignmentRecords,setAssignmentRecords]=useState<any[]>([]),[reserveRecords,setReserveRecords]=useState<any[]>([]),[batchRecords,setBatchRecords]=useState<any[]>([]),[participantRecords,setParticipantRecords]=useState<any[]>([]),[attendanceRecords,setAttendanceRecords]=useState<any[]>([]),[ruleRecords,setRuleRecords]=useState<any[]>([]),[trainingPlanRecords,setTrainingPlanRecords]=useState<any[]>([]),[blockRecords,setBlockRecords]=useState<any[]>([]),[allocationRecords,setAllocationRecords]=useState<any[]>([]),[allocationTargets,setAllocationTargets]=useState<Record<string,string>>({});
  const [notice,setNotice]=useState("Connecting to Supabase…"),[busy,setBusy]=useState(false),[issues,setIssues]=useState<string[]>([]);
@@ -61,7 +63,7 @@ export default function App(){
  }),[stations]);
 
  useEffect(()=>{supabase.auth.getSession().then(({data})=>setSession(data.session));const {data:{subscription}}=supabase.auth.onAuthStateChange((_e,s)=>setSession(s));return()=>subscription.unsubscribe();},[]);
- useEffect(()=>{if(session)loadDistricts();},[session]);
+ useEffect(()=>{if(session){loadDistricts();loadUserPermissions();}},[session]);
  useEffect(()=>{if(session&&districtId)loadDistrictData();},[session,districtId]);
  // Keep every open page on the same current district snapshot. Imports and edits
  // made from another page/session are coalesced into one full relational refresh.
@@ -92,6 +94,7 @@ export default function App(){
   };
  },[session,districtId]);
  useEffect(()=>{if(session&&districtId&&uploadConfig[section]){(async()=>{const q=await fetchAllDistrictRows(uploadConfig[section].table,"*",districtId);if(!q.error)setUploadRecords(q.data||[]);})();}},[session,districtId,section]);
+ async function loadUserPermissions(){if(!session?.user?.id){setIsGlobalAdmin(false);return;}const {data,error}=await supabase.from("user_profiles").select("is_global_admin").eq("user_id",session.user.id).maybeSingle();if(error){setIsGlobalAdmin(false);setNotice("Could not verify administrator permissions: "+error.message);return;}setIsGlobalAdmin(data?.is_global_admin===true);}
  async function loadDistricts(){const {data,error}=await supabase.from("districts").select("id,name,code").eq("is_active",true).order("name");if(error){setNotice("District access error: "+error.message);return;}setDistricts(data||[]);if(!districtId&&data?.length)setDistrictId(data.find(d=>d.name==="Kohat")?.id||data[0].id);}
  async function beginImportAudit(importType:string,filename:string,rowCount:number){
    const {data,error}=await supabase.from("data_imports").insert({district_id:districtId,import_type:importType,filename,row_count:rowCount,status:"Processing",created_by:session?.user?.id||null,summary:{started_at:new Date().toISOString()}}).select("id").single();
@@ -125,6 +128,10 @@ export default function App(){
  }
  async function loadDistrictData(){
   setNotice("Loading district records from Supabase…");
+  const globalSettingsQ=await supabase.from("global_election_settings").select("setting_key,setting_value,is_locked").order("setting_key");
+  if(globalSettingsQ.error){setNotice("Could not load Super Admin settings: "+globalSettingsQ.error.message);return;}
+  setGlobalSettings(globalSettingsQ.data||[]);
+  setGlobalSettingsDraft(Object.fromEntries((globalSettingsQ.data||[]).map((r:any)=>[r.setting_key,{value:typeof r.setting_value==="string"?r.setting_value:JSON.stringify(r.setting_value??""),locked:!!r.is_locked}])));
   const [t,c,s,b,a,staffCount,trainerCount,venueCount,ruleCount,planCount,settingsCount,assignmentCount,reserveCount,batchCount,participantCount,attendanceCount,importsQ,issuesQ]=await Promise.all([
    supabase.from("election_tehsils").select("id",{count:"exact",head:true}).eq("district_id",districtId),
    supabase.from("election_councils").select("id",{count:"exact",head:true}).eq("district_id",districtId),
@@ -134,9 +141,9 @@ export default function App(){
    fetchAllDistrictRows("election_staff","id,tehsil_id,source_staff_id,name,gender,cnic,mobile,department,designation,bps_text,availability,place_of_posting,qualification,date_of_retirement,remarks,source_data",districtId),
    fetchAllDistrictRows("master_trainers","id,name,gender,cnic,mobile,designation,department,bps_text,trainer_id,assigned_training_category,availability_status,remarks,is_placeholder,source_data",districtId),
    fetchAllDistrictRows("training_venues","id,name,address,capacity,venue_address,gender_group,classroom,availability,available_sessions,available_from,available_to,source_data",districtId),
-   fetchAllDistrictRows("demand_rules","id,role,station_type,gender,basis,per_unit,adjustment,is_active,rule_data",districtId),
+   fetchAllDistrictRows("demand_rules","id,role,station_type,gender,basis,per_unit,adjustment,is_active,is_locked,rule_data",districtId),
    fetchAllDistrictRows("training_plans","id,plan_type,name,start_date,end_date,duration_days,batch_capacity,plan_data",districtId),
-   fetchAllDistrictRows("district_settings","id,setting_key,setting_value",districtId),
+   fetchAllDistrictRows("district_settings","id,setting_key,setting_value,is_locked",districtId),
    fetchAllDistrictRows("staff_assignments","id,staff_id,station_id,role,assignment_status,assignment_data",districtId),
    fetchAllDistrictRows("reserve_staff","id,staff_id,reserve_role,reserve_status,reserve_data",districtId),
    fetchAllDistrictRows("training_batches","id,plan_id,batch_number,training_date,start_time,end_time,gender_group,role_group,venue_id,room_id,capacity,batch_data",districtId),
@@ -151,7 +158,7 @@ export default function App(){
   setRows((b.data||[]).map(x=>x.source_data as DataRow).filter(Boolean));setBlockRecords(b.data||[]);setAllocationRecords(a.data||[]);setAllocationTargets({});
   setCounts({tehsils:t.count||0,stations:s.count||0,blocks:b.count||0,allocations:a.count||0,allocatedBlocks:new Set((a.data||[]).map(x=>x.block_id)).size,linkedStations:new Set((a.data||[]).map(x=>x.station_id).filter(Boolean)).size});
   setStaffRecords(staffCount.data||[]);setRuleRecords(ruleCount.data||[]);setTrainingPlanRecords(planCount.data||[]);
-  const generalSettings:Record<string,string>={},trainingSettings:Record<string,string>={};(settingsCount.data||[]).forEach((r:any)=>{const key=String(r.setting_key||""),value=typeof r.setting_value==="string"?r.setting_value:JSON.stringify(r.setting_value??"");if(key.startsWith("training:"))trainingSettings[key.slice(9)]=value;else generalSettings[key]=value;});if(generalSettings["Form-II Right-Side Vertical Instruction"]===undefined)generalSettings["Form-II Right-Side Vertical Instruction"]="";setSettingsDraft(generalSettings);setTrainingDraft(trainingSettings);setTrainerRecords(trainerCount.data||[]);setVenueRecords(venueCount.data||[]);setAssignmentRecords(assignmentCount.data||[]);setReserveRecords(reserveCount.data||[]);setBatchRecords(batchCount.data||[]);setParticipantRecords(participantCount.data||[]);setAttendanceRecords(attendanceCount.data||[]);
+  const generalSettings:Record<string,string>={},trainingSettings:Record<string,string>={};(globalSettingsQ.data||[]).forEach((r:any)=>{const key=String(r.setting_key||""),value=typeof r.setting_value==="string"?r.setting_value:JSON.stringify(r.setting_value??"");if(key.startsWith("training:"))trainingSettings[key.slice(9)]=value;else generalSettings[key]=value;});(settingsCount.data||[]).forEach((r:any)=>{const key=String(r.setting_key||""),value=typeof r.setting_value==="string"?r.setting_value:JSON.stringify(r.setting_value??"");if(key.startsWith("training:"))trainingSettings[key.slice(9)]=value;else generalSettings[key]=value;});(globalSettingsQ.data||[]).filter((r:any)=>r.is_locked).forEach((r:any)=>{const key=String(r.setting_key||""),value=typeof r.setting_value==="string"?r.setting_value:JSON.stringify(r.setting_value??"");if(key.startsWith("training:"))trainingSettings[key.slice(9)]=value;else generalSettings[key]=value;});if(generalSettings["Form-II Right-Side Vertical Instruction"]===undefined)generalSettings["Form-II Right-Side Vertical Instruction"]="";setDistrictSettingKeys((settingsCount.data||[]).map((r:any)=>String(r.setting_key)));setSettingsDraft(generalSettings);setTrainingDraft(trainingSettings);setTrainerRecords(trainerCount.data||[]);setVenueRecords(venueCount.data||[]);setAssignmentRecords(assignmentCount.data||[]);setReserveRecords(reserveCount.data||[]);setBatchRecords(batchCount.data||[]);setParticipantRecords(participantCount.data||[]);setAttendanceRecords(attendanceCount.data||[]);
   setOpsCounts({staff:staffCount.count||0,trainers:trainerCount.count||0,venues:venueCount.count||0,rules:ruleCount.count||0,plans:planCount.count||0,settings:settingsCount.count||0,assignments:assignmentCount.count||0,reserves:reserveCount.count||0,batches:batchCount.count||0,participants:participantCount.count||0,attendance:attendanceCount.count||0});
   setNotice("Connected to Supabase · "+(activeDistrict?.name||"District")+" data loaded from PostgreSQL.");
  }
@@ -331,12 +338,26 @@ export default function App(){
   try{const {error}=await supabase.from("district_settings").delete().eq("district_id",districtId).eq("setting_key",settingKey);if(error)throw error;await loadDistrictData();setNotice("Setting deleted from the selected district.");}
   catch(e){setNotice("Setting could not be deleted: "+(e instanceof Error?e.message:String(e)));}finally{setBusy(false);}
  }
+ async function saveGlobalSettings(){
+  if(!isGlobalAdmin){setNotice("Only the Super Admin can change global defaults or lock rules.");return;}
+  setBusy(true);setNotice("Saving global defaults and policy locks…");
+  try{
+   const parse=(v:string):any=>{try{return JSON.parse(v);}catch{return v;}};
+   const rows=Object.entries(globalSettingsDraft).map(([setting_key,d])=>({setting_key,setting_value:parse(d.value),is_locked:!!d.locked,updated_by:session?.user?.id||null}));
+   if(newGlobalKey.trim())rows.push({setting_key:newGlobalKey.trim(),setting_value:parse(newGlobalValue),is_locked:false,updated_by:session?.user?.id||null} as any);
+   if(rows.length){const {error}=await supabase.from("global_election_settings").upsert(rows,{onConflict:"setting_key"});if(error)throw error;}
+   setNewGlobalKey("");setNewGlobalValue("");await loadDistrictData();setNotice("Global defaults saved. Locked settings are now enforced by the database for every district.");
+  }catch(e){setNotice("Global settings were not saved: "+(e instanceof Error?e.message:String(e)));}
+  finally{setBusy(false);}
+ }
+ const isSettingLocked=(key:string)=>globalSettings.some((r:any)=>r.setting_key===key&&r.is_locked);
+ const hasDistrictSetting=(key:string)=>districtSettingKeys.includes(key);
  async function saveSettingsAndRules(){
   if(!districtId)return;setBusy(true);setNotice("Saving district settings and training rules…");
   try{
-   const asJsonValue=(value:string):any=>{try{return JSON.parse(value);}catch{return value;}};const records=[...Object.entries(settingsDraft).map(([setting_key,value])=>({district_id:districtId,setting_key,setting_value:asJsonValue(value)})),...Object.entries(trainingDraft).map(([key,value])=>({district_id:districtId,setting_key:"training:"+key,setting_value:asJsonValue(value)}))];
+   const asJsonValue=(value:string):any=>{try{return JSON.parse(value);}catch{return value;}};const lockedKeys=new Set(globalSettings.filter((r:any)=>r.is_locked).map((r:any)=>String(r.setting_key)));const records=[...Object.entries(settingsDraft).filter(([key])=>isGlobalAdmin||!lockedKeys.has(key)).map(([setting_key,value])=>({district_id:districtId,setting_key,setting_value:asJsonValue(value)})),...Object.entries(trainingDraft).filter(([key])=>isGlobalAdmin||!lockedKeys.has("training:"+key)).map(([key,value])=>({district_id:districtId,setting_key:"training:"+key,setting_value:asJsonValue(value)}))];
    for(let i=0;i<records.length;i+=100){for(const row of records.slice(i,i+100)){const {data:existing,error:findError}=await supabase.from("district_settings").select("id").eq("district_id",districtId).eq("setting_key",row.setting_key).maybeSingle();if(findError)throw findError;const result=existing?.id?await supabase.from("district_settings").update({setting_value:row.setting_value}).eq("id",existing.id):await supabase.from("district_settings").insert(row);if(result.error)throw result.error;}}
-   for(const [id,edit] of Object.entries(ruleEdits)){const original=ruleRecords.find(r=>r.id===id);if(!original)continue;const rule_data={...(original.rule_data||{}),...edit};const {error}=await supabase.from("demand_rules").update({role:edit["Duty Role"]??original.role,station_type:edit["Station Type"]??original.station_type,gender:edit["Required Gender"]??original.gender,basis:edit.Basis??original.basis,per_unit:edit["Posts per Unit"]??original.per_unit,adjustment:edit["Adjustment per Station"]??original.adjustment,is_active:edit.is_active??original.is_active,rule_data}).eq("id",id);if(error)throw error;}
+   for(const [id,edit] of Object.entries(ruleEdits)){const original=ruleRecords.find(r=>r.id===id);if(!original)continue;const rule_data={...(original.rule_data||{}),...edit};const {error}=await supabase.from("demand_rules").update({role:edit["Duty Role"]??original.role,station_type:edit["Station Type"]??original.station_type,gender:edit["Required Gender"]??original.gender,basis:edit.Basis??original.basis,per_unit:edit["Posts per Unit"]??original.per_unit,adjustment:edit["Adjustment per Station"]??original.adjustment,is_active:edit.is_active??original.is_active,is_locked:isGlobalAdmin?(edit.is_locked??original.is_locked):original.is_locked,rule_data}).eq("id",id);if(error)throw error;}
    setRuleEdits({});
    await loadDistrictData();setNotice("Settings and demand rules saved. Updated values are now loaded from the district database.");
   }catch(e){setNotice("Settings were not fully saved: "+(e instanceof Error?e.message:String(e)));}
