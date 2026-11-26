@@ -23,7 +23,8 @@ export default function App(){
  const [trainingDraft,setTrainingDraft]=useState<Record<string,string>>({});
  const [problemFilter,setProblemFilter]=useState(""),[recordSearch,setRecordSearch]=useState(""),[allocationSearch,setAllocationSearch]=useState("");
  const [newDistrictName,setNewDistrictName]=useState("");
- const [newDistrictCode,setNewDistrictCode]=useState("");\n const [recordModal,setRecordModal]=useState<{kind:string;record:any|null}|null>(null);
+ const [newDistrictCode,setNewDistrictCode]=useState("");
+ const [recordModal,setRecordModal]=useState<{kind:string;record:any|null}|null>(null);
  const [recordDraft,setRecordDraft]=useState<Record<string,string>>({});
  const uploadConfig:Record<string,{table:string;title:string;description:string;headers:string[];required:string[]}> = {
   "Staff Data":{table:"election_staff",title:"Staff Data / Employee Roster",description:"Import the complete employee roster. Source S.No and a unique staff profile are used for matching; duplicate CNICs are retained as separate records and flagged for review.",headers:["S.No","Tehsil","Name of Officer/Official","Gender","CNIC #","Department","Designation","BPS","Place of Posting","Qualification","Date of Retirement","Mobile #","Availability (Y/N)"],required:["Tehsil","Name of Officer/Official","Gender"]},
