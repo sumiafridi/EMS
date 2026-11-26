@@ -10,7 +10,7 @@ const chunkSize=20;
 
 export default function App(){
  const [session,setSession]=useState<any>(null),[email,setEmail]=useState(""),[districts,setDistricts]=useState<District[]>([]),[districtId,setDistrictId]=useState(""),[section,setSection]=useState("Overview");
- const [rows,setRows]=useState<DataRow[]>([]),[stations,setStations]=useState<StationRow[]>([]),[counts,setCounts]=useState({tehsils:0,stations:0,blocks:0,allocations:0}),[opsCounts,setOpsCounts]=useState({staff:0,trainers:0,venues:0,rules:0,plans:0});
+ const [rows,setRows]=useState<DataRow[]>([]),[stations,setStations]=useState<StationRow[]>([]),[counts,setCounts]=useState({tehsils:0,stations:0,blocks:0,allocations:0}),[opsCounts,setOpsCounts]=useState({staff:0,trainers:0,venues:0,rules:0,plans:0,settings:0});
  const [notice,setNotice]=useState("Connecting to Supabase…"),[busy,setBusy]=useState(false),[issues,setIssues]=useState<string[]>([]);
  const input=useRef<HTMLInputElement>(null),legacyInput=useRef<HTMLInputElement>(null),uploadInput=useRef<HTMLInputElement>(null);
  const [uploadRows,setUploadRows]=useState<Record<string,any[]>>({});
@@ -54,7 +54,7 @@ export default function App(){
  async function loadDistricts(){const {data,error}=await supabase.from("districts").select("id,name,code").eq("is_active",true).order("name");if(error){setNotice("District access error: "+error.message);return;}setDistricts(data||[]);if(!districtId&&data?.length)setDistrictId(data.find(d=>d.name==="Kohat")?.id||data[0].id);}
  async function loadDistrictData(){
   setNotice("Loading district records from Supabase…");
-  const [t,c,s,b,a,staffCount,trainerCount,venueCount,ruleCount,planCount]=await Promise.all([
+  const [t,c,s,b,a,staffCount,trainerCount,venueCount,ruleCount,planCount,settingsCount]=await Promise.all([
    supabase.from("election_tehsils").select("id",{count:"exact",head:true}).eq("district_id",districtId),
    supabase.from("election_councils").select("id",{count:"exact",head:true}).eq("district_id",districtId),
    supabase.from("polling_stations").select("id,tehsil_id,ps_number,nc_vc_ps_number,tehsil_ps_number,name,station_type,male_booths,female_booths,male_voters,female_voters,source_data",{count:"exact"}).eq("district_id",districtId).limit(2000),
@@ -64,13 +64,14 @@ export default function App(){
    supabase.from("master_trainers").select("id",{count:"exact",head:true}).eq("district_id",districtId),
    supabase.from("training_venues").select("id",{count:"exact",head:true}).eq("district_id",districtId),
    supabase.from("demand_rules").select("id",{count:"exact",head:true}).eq("district_id",districtId),
-   supabase.from("training_plans").select("id",{count:"exact",head:true}).eq("district_id",districtId)
+   supabase.from("training_plans").select("id",{count:"exact",head:true}).eq("district_id",districtId),
+   supabase.from("district_settings").select("id",{count:"exact",head:true}).eq("district_id",districtId)
   ]);
-  const err=[t.error,c.error,s.error,b.error,a.error,staffCount.error,trainerCount.error,venueCount.error,ruleCount.error,planCount.error].find(Boolean);if(err){setNotice("Could not load district data: "+err.message);return;}
+  const err=[t.error,c.error,s.error,b.error,a.error,staffCount.error,trainerCount.error,venueCount.error,ruleCount.error,planCount.error,settingsCount.error].find(Boolean);if(err){setNotice("Could not load district data: "+err.message);return;}
   setStations((s.data||[]) as StationRow[]);
   setRows((b.data||[]).map(x=>x.source_data as DataRow).filter(Boolean));
   setCounts({tehsils:t.count||0,stations:s.count||0,blocks:b.count||0,allocations:a.count||0});
-  setOpsCounts({staff:staffCount.count||0,trainers:trainerCount.count||0,venues:venueCount.count||0,rules:ruleCount.count||0,plans:planCount.count||0});
+  setOpsCounts({staff:staffCount.count||0,trainers:trainerCount.count||0,venues:venueCount.count||0,rules:ruleCount.count||0,plans:planCount.count||0,settings:settingsCount.count||0});
   setNotice("Connected to Supabase · "+(activeDistrict?.name||"District")+" data loaded from PostgreSQL.");
  }
  function downloadTemplate(){const headers=["District","Tehsil No","Tehsil","Tehsil PS No","NC/VC No","Council Type (NC / VC)","Council Name","NC/VC PS No","PS No","No & Name of Polling Station","PS Type (Male / Female / Combined)","Booths Male","Booths Female","Male Voters (block)","Female Voters (block)","Census Block Code","Electoral Area name"];const ws=XLSX.utils.aoa_to_sheet([headers]);ws["!cols"]=headers.map(h=>({wch:Math.max(16,h.length+2)}));const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,ws,"DATA Template");XLSX.writeFile(book,"KPK_Election_DATA_Template.xlsx");}
@@ -81,7 +82,7 @@ export default function App(){
   if(kind==="Staff Data")return norm(pick(row,"CNIC #","CNIC"))||("source:"+norm(pick(row,"S.No","S No","Serial No")));
   if(kind==="Master Trainers")return norm(pick(row,"CNIC","CNIC #"))||[norm(pick(row,"Master Trainer Name","name","Name")),norm(pick(row,"Gender","gender"))].join("|");
   if(kind==="Training Venues")return [norm(pick(row,"Gender","gender")),norm(pick(row,"Venue Name","venue_name")),norm(pick(row,"Classroom Name/No.","Classroom","classroom"))].join("|");
-  if(kind==="Demand Rules")return norm(pick(row,"Rule Key"))||[norm(pick(row,"Duty Role")),norm(pick(row,"Station Type")),norm(pick(row,"Required Gender"))].join("|");
+  if(kind==="Demand Rules"){const source=row.rule_data||row;return norm(pick(source,"Rule Key"))||[norm(pick(source,"Duty Role","role")),norm(pick(source,"Station Type","station_type")),norm(pick(source,"Required Gender","gender"))].join("|");}
   if(kind==="Training Plans")return norm(pick(row,"Plan Type","plan_type"));
   return norm(pick(row,"Setting Key","Key","setting_key"));
  }
@@ -128,7 +129,7 @@ export default function App(){
    const existingResult=await (supabase as any).from(cfg.table).select("*").eq("district_id",districtId).limit(10000);
    if(existingResult.error)throw existingResult.error;
    const existing=existingResult.data||[];
-   const existingMap=new Map(existing.map((r:any)=>[identity(kind,kind==="District Settings"?{"Setting Key":r.setting_key}:r.source_data||r),r]));
+   const existingMap=new Map(existing.map((r:any)=>[identity(kind,kind==="District Settings"?{"Setting Key":r.setting_key}:kind==="Demand Rules"?(r.rule_data||r):r.source_data||r,r]));
    const tehsilResult=kind==="Staff Data"?await supabase.from("election_tehsils").select("id,name").eq("district_id",districtId):{data:[],error:null};
    if(tehsilResult.error)throw tehsilResult.error;
    const tehsilMap=new Map((tehsilResult.data||[]).map((t:any)=>[norm(t.name),t.id]));
@@ -357,7 +358,7 @@ export default function App(){
  <div className="panel"><h3>Database relationship check</h3><p>{counts.stations===counts.allocations&&counts.blocks===counts.allocations?"The current record counts match. Verify station/block relationships for duplicate or missing links.":"Record counts differ: census blocks, allocations and polling stations require reconciliation."}</p><div className="cards"><Metric label="TEHSILS" value={counts.tehsils}/><Metric label="POLLING STATIONS" value={counts.stations}/><Metric label="CENSUS BLOCKS" value={counts.blocks}/><Metric label="BLOCK–STATION LINKS" value={counts.allocations}/></div></div></>}
  {section==="DATA Import"&&<div className="panel import-panel"><div className="upload-icon">⇧</div><h2>Upload primary polling station DATA</h2><p>Upload the district DATA Excel/CSV file. It is sent to Supabase in batches of up to 20 rows; slow batches are automatically split and linked to Tehsils, Councils, Polling Stations, Census Blocks and allocations.</p><input ref={input} hidden type="file" accept=".xlsx,.xls,.csv" onChange={e=>importData(e.target.files?.[0])}/><div className="header-actions"><button className="btn light" onClick={downloadTemplate}>Download Excel Template</button><button className="btn primary" disabled={busy||!districtId} onClick={()=>input.current?.click()}>{busy?"Uploading…":"Choose DATA Excel / CSV"}</button></div><div className="hint">Required: Tehsil, Council Type, Council No, Council Name, PS No, station name/type, booths, Census Block Code and voter columns. Original row fields are retained.</div>{issues.length>0&&<div className="issue-box"><b>Rows requiring review ({issues.length}{issues.length===300?"+":""})</b>{issues.slice(0,30).map((x,i)=><div key={i}>{x}</div>)}</div>}</div>}
  {uploadConfig[section]&&<div className="panel upload-workspace">
-  <div className="panel-head"><div><div className="eyebrow">DISTRICT DATA MANAGEMENT</div><h2>{uploadConfig[section].title}</h2><p>{uploadConfig[section].description}</p></div><span className="tag">{opsCounts[section==="Staff Data"?"staff":section==="Master Trainers"?"trainers":section==="Training Venues"?"venues":section==="Demand Rules"?"rules":"plans"]?.toLocaleString?.()||"—"} records in overview</span></div>
+  <div className="panel-head"><div><div className="eyebrow">DISTRICT DATA MANAGEMENT</div><h2>{uploadConfig[section].title}</h2><p>{uploadConfig[section].description}</p></div><span className="tag">{opsCounts[section==="Staff Data"?"staff":section==="Master Trainers"?"trainers":section==="Training Venues"?"venues":section==="Demand Rules"?"rules":section==="District Settings"?"settings":"plans"]?.toLocaleString?.()||"—"} records in overview</span></div>
   <div className="upload-actions"><input ref={uploadInput} hidden type="file" accept=".xlsx,.xls,.csv" onChange={e=>prepareUpload(e.target.files?.[0],section)}/><button className="btn light" onClick={()=>downloadUploadTemplate(section)}>Download {section} Template</button><button className="btn primary" disabled={busy||!districtId} onClick={()=>uploadInput.current?.click()}>{busy?"Reading…":"Choose Excel / CSV"}</button><button className="btn primary" disabled={busy||!(uploadRows[section]||[]).length} onClick={()=>commitUpload(section)}>Import {uploadRows[section]?.length||0} rows</button><button className="btn light" disabled={busy} onClick={async()=>{const q=await (supabase as any).from(uploadConfig[section].table).select("*").eq("district_id",districtId).limit(500);if(q.error)setNotice(q.error.message);else setUploadRecords(q.data||[]);}}>Refresh records</button></div>
   <div className="upload-hint">Incremental import: matching staff CNIC/source number, trainer CNIC, venue/classroom identity, rule key, plan type or setting key is updated; new rows are inserted. Rows with warnings are not automatically discarded. Original source columns remain stored.</div>
   {(uploadRows[section]||[]).length>0&&<><h3>Import preview — {uploadRows[section].length.toLocaleString()} rows</h3><div className="table-wrap preview-table"><table><thead><tr>{Object.keys(uploadRows[section][0]||{}).slice(0,10).map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{uploadRows[section].slice(0,8).map((r:any,i:number)=><tr key={i}>{Object.keys(uploadRows[section][0]||{}).slice(0,10).map(h=><td key={h}>{String(r[h]??"")}</td>)}</tr>)}</tbody></table></div><p className="hint">Showing first 8 rows and first 10 columns. All detected rows will be imported.</p></>}
