@@ -593,16 +593,24 @@ export default function App(){
    const {data:tehsils,error:tehsilError}=await supabase.from("election_tehsils").select("id,name").eq("district_id",districtId);
    if(tehsilError)throw tehsilError;
    const tehsilById=new Map<string,string>((tehsils||[]).map((t:any):[string,string]=>[t.id,String(t.name)]));const knownTehsils=new Set((tehsils||[]).map((t:any)=>String(t.name).trim().toLowerCase()));
-   const seenStaffIdentity=new Set<string>();const eligible=staffRecords.map((r:any)=>{const src=r.source_data||{};const name=String(r.name??src["Name of Officer/Official"]??"").trim();const rawGender=String(r.gender??src.Gender??"").trim().toLowerCase();const gender=rawGender==="male"||rawGender==="m"?"Male":rawGender==="female"||rawGender==="f"?"Female":"";const rawBps=String(r.bps_text??src.BPS??"").trim();const bps=rawBps!==""&&Number.isInteger(Number(rawBps))?Number(rawBps):null;const rawAvailability=String(r.availability??src["Availability (Y/N)"]??"").trim().toLowerCase();const tehsil=String(src.Tehsil??(tehsilById.get(r.tehsil_id)||"")).trim();const cnic=String(r.cnic??src["CNIC #"]??"").trim();return {id:r.id,name,gender,bps,rawBps,tehsil,availability:rawAvailability,cnic,designation:String(r.designation??src.Designation??"").trim()};}).filter((r:any)=>{if(!(r.id&&r.name&&r.gender&&r.tehsil&&knownTehsils.has(r.tehsil.toLowerCase())&&r.bps!==null&&r.bps>=7&&["y","yes","available"].includes(r.availability)))return false;const key=r.cnic.replace(/\D/g,"")||r.id;if(seenStaffIdentity.has(key))return false;seenStaffIdentity.add(key);return true;});
-   const seniorPool=eligible.filter((r:any)=>r.bps>=16);
-   const juniorPool=eligible.filter((r:any)=>r.bps>=7&&r.bps<=15);
-   seniorPool.sort((a:any,b:any)=>b.bps-a.bps);juniorPool.sort((a:any,b:any)=>b.bps-a.bps);
+   const cnicCounts=new Map<string,number>();staffRecords.forEach((r:any)=>{const c=String(r.cnic??r.source_data?.["CNIC #"]??"").replace(/\D/g,"");if(c)cnicCounts.set(c,(cnicCounts.get(c)||0)+1);});const duplicateCnics=new Set([...cnicCounts].filter(([,count])=>count>1).map(([cnic])=>cnic));
+   const seenStaffIdentity=new Set<string>();const eligible=staffRecords.map((r:any)=>{const src=r.source_data||{};const name=String(r.name??src["Name of Officer/Official"]??"").trim();const rawGender=String(r.gender??src.Gender??"").trim().toLowerCase();const gender=rawGender==="male"||rawGender==="m"?"Male":rawGender==="female"||rawGender==="f"?"Female":"";const rawBps=String(r.bps_text??src.BPS??"").trim();const bps=rawBps!==""&&Number.isInteger(Number(rawBps))?Number(rawBps):null;const rawAvailability=String(r.availability??src["Availability (Y/N)"]??"").trim().toLowerCase();const tehsil=String(src.Tehsil??(tehsilById.get(r.tehsil_id)||"")).trim();const cnic=String(r.cnic??src["CNIC #"]??"").trim();return {id:r.id,name,gender,bps,rawBps,tehsil,availability:rawAvailability,cnic,designation:String(r.designation??src.Designation??"").trim()};}).filter((r:any)=>{if(!(r.id&&r.name&&r.gender&&r.tehsil&&knownTehsils.has(r.tehsil.toLowerCase())&&r.bps!==null&&r.bps>=7&&["y","yes","available"].includes(r.availability)))return false;const normalizedCnic=r.cnic.replace(/\D/g,"");if(normalizedCnic&&duplicateCnics.has(normalizedCnic))return false;const key=normalizedCnic||r.id;if(seenStaffIdentity.has(key))return false;seenStaffIdentity.add(key);return true;});
+   const settingNumber=(key:string,fallback:number)=>{const raw=settingsDraft["allocation:"+key];const n=Number(raw);return raw!==undefined&&raw!==""&&Number.isFinite(n)?n:fallback;};
+   const presMin=settingNumber("presiding_min_bps",16),seniorApoMin=settingNumber("senior_apo_min_bps",16);
+   const apoMin=settingNumber("apo_min_bps",7),apoMax=settingNumber("apo_max_bps",15),poMin=settingNumber("po_min_bps",7),poMax=settingNumber("po_max_bps",15);
+   const allowSeniorSurplus=String(settingsDraft["allocation:allow_senior_surplus_to_junior"]??"true").toLowerCase()==="true";
+   const homeTehsilFirst=String(settingsDraft["allocation:home_tehsil_first"]??"true").toLowerCase()==="true";
+   const seniorPool=eligible.filter((r:any)=>r.bps>=Math.min(presMin,seniorApoMin));
+   const presPool=eligible.filter((r:any)=>r.bps>=presMin),seniorApoPool=eligible.filter((r:any)=>r.bps>=seniorApoMin);
+   const apoPool=eligible.filter((r:any)=>r.bps>=apoMin&&r.bps<=apoMax),poPool=eligible.filter((r:any)=>r.bps>=poMin&&r.bps<=poMax);
+   for(const pool of [seniorPool,presPool,seniorApoPool,apoPool,poPool])pool.sort((a:any,b:any)=>b.bps-a.bps);
    const used=new Set<string>(),generated:any[]=[];
    const roleDemand=(d:any,role:string,gender:string)=>{const suffix=gender==="Male"?"Male":"Female";const key=role==="Presiding Officer"?"pres":role==="Senior APO"?"srapo":role==="APO"?"apo":"po";return Number(d[key+suffix]||0);};
    const candidate=(pool:any[],tehsil:string,gender:string,homeOnly:boolean)=>pool.find((r:any)=>!used.has(r.id)&&r.gender===gender&&(homeOnly?r.tehsil.toLowerCase()===tehsil.toLowerCase():true));
    const fillRole=(role:string,group:string,pool:any[])=>{
-    for(let pass=0;pass<2;pass++){
-     const homeOnly=pass===0;
+    const passes=homeTehsilFirst?2:1;
+    for(let pass=0;pass<passes;pass++){
+     const homeOnly=homeTehsilFirst&&pass===0;
      for(const d of calculated){
       if(!d.id)continue;
       for(const gender of ["Male","Female"]){
@@ -617,12 +625,11 @@ export default function App(){
      }
     }
    };
-   fillRole("Presiding Officer","Presiding/Sr APO",seniorPool);
-   fillRole("Senior APO","Presiding/Sr APO",seniorPool);
-   fillRole("APO","APO/PO",juniorPool);
-   fillRole("PO","APO/PO",juniorPool);
-   fillRole("APO","APO/PO",seniorPool);
-   fillRole("PO","APO/PO",seniorPool);
+   fillRole("Presiding Officer","Presiding/Sr APO",presPool);
+   fillRole("Senior APO","Presiding/Sr APO",seniorApoPool);
+   fillRole("APO","APO/PO",apoPool);
+   fillRole("PO","APO/PO",poPool);
+   if(allowSeniorSurplus){fillRole("APO","APO/PO",seniorPool);fillRole("PO","APO/PO",seniorPool);}
    if(!generated.length&&demand>0)throw new Error("No eligible staff could be assigned. Check staff gender, Tehsil, availability and numeric BPS values.");
    const insertedIds:string[]=[];
    for(let i=0;i<generated.length;i+=250){
@@ -666,17 +673,21 @@ export default function App(){
   active.forEach(a=>{const st=staffById.get(a.staff_id);if(st)allPeople.push({staff_id:a.staff_id,role:normRole(a.role),gender:String(st.gender||a.assignment_data?.gender||"").toLowerCase(),name:st.name||st.source_data?.["Name of Officer/Official"]||"" ,source:"Duty"});});
   reserveRecords.filter(r=>r.reserve_status==="Available").forEach(r=>{const st=staffById.get(r.staff_id);if(st)allPeople.push({staff_id:r.staff_id,role:normRole(r.reserve_role),gender:String(st.gender||r.reserve_data?.gender||"").toLowerCase(),name:st.name||st.source_data?.["Name of Officer/Official"]||"",source:"Reserve"});});
   const usedPeople=new Set<string>();const batchesToSave:any[]=[],participantsToSave:any[]=[];
-  const includeSunday=String(trainingDraft.include_sunday||"").toLowerCase()==="true";
+  const includeSunday=String(trainingDraft.include_sunday??"false").toLowerCase()==="true";
   const dateObj=(v:string)=>{const [y,m,d]=String(v).split("-").map(Number);return new Date(Date.UTC(y,m-1,d,12));};
   const dateText=(d:Date)=>d.toISOString().slice(0,10);
   const addWorkingDays=(date:string,n:number)=>{const d=dateObj(date);let added=0;while(added<n){d.setUTCDate(d.getUTCDate()+1);if(includeSunday||d.getUTCDay()!==0)added++;}return dateText(d);};
   const workingDate=(date:string)=>includeSunday||dateObj(date).getUTCDay()!==0;
   const time=(key:string,fallback:string)=>String(trainingDraft[key]||fallback);
+  const nextWorkingDate=(date:string)=>{let d=dateObj(date);do{d.setUTCDate(d.getUTCDate()+1);}while(!includeSunday&&d.getUTCDay()===0);return dateText(d);};
+  const presEndForAuto=String(trainingDraft.pres_end_date||presPlan.end_date||"");
   for(const plan of [presPlan,apoPlan]){
    const isPres=plan.plan_type==="presiding_srapo",roleGroup=isPres?"Presiding / Senior APO":"APO + PO combined";
-   const cap=Number(trainingDraft[isPres?"pres_batch_size":"apo_batch_size"]||plan.batch_capacity|| (isPres?25:40));
-   const duration=Number(trainingDraft[isPres?"pres_duration_days":"apo_duration_days"]||plan.duration_days||1);
-   const start=String(trainingDraft[isPres?"pres_start_date":"apo_start_date"]||plan.start_date||"");
+   const apoPoCap=Math.min(Number(trainingDraft.apo_batch_size||plan.plan_data?.apo_batch_size||plan.batch_capacity||40),Number(trainingDraft.po_batch_size||plan.plan_data?.po_batch_size||plan.batch_capacity||40));
+   const cap=Number(isPres?(trainingDraft.pres_batch_size||plan.plan_data?.pres_batch_size||plan.batch_capacity||25):apoPoCap);
+   const duration=Number(isPres?(trainingDraft.pres_duration_days||plan.plan_data?.pres_duration_days||plan.duration_days||1):Math.max(Number(trainingDraft.apo_duration_days||plan.plan_data?.apo_duration_days||plan.duration_days||1),Number(trainingDraft.po_duration_days||plan.plan_data?.po_duration_days||plan.duration_days||1)));
+   const autoApoStart=String(trainingDraft.apo_start_mode||"auto").toLowerCase()==="auto"&&presEndForAuto?nextWorkingDate(presEndForAuto):"";
+   const start=String(trainingDraft[isPres?"pres_start_date":"apo_start_date"]||(!isPres?autoApoStart:"")||plan.start_date||"");
    const end=String(trainingDraft[isPres?"pres_end_date":"apo_end_date"]||plan.end_date||"");
    if(!start||!end||!Number.isInteger(cap)||cap<1||!Number.isInteger(duration)||duration<1)throw new Error(roleGroup+" has invalid date, capacity or duration settings.");
    const planData=plan.plan_data||{};
@@ -690,7 +701,9 @@ export default function App(){
     const venues=venueRows.filter(v=>String(v.gender_group||v.source_data?.gender||"").toLowerCase()===g).sort((a,b)=>String(a.classroom||a.source_data?.classroom||a.address||"").localeCompare(String(b.classroom||b.source_data?.classroom||b.address||"")));
     if(!venues.length)throw new Error("No "+gender+" classroom is available for "+roleGroup+". Add or update its venue records.");
     const requiredSeats=trainingProjection.groups.find(x=>x.group===roleGroup&&x.gender===gender)?.seats||0;
-    const neededBatches=Math.ceil(requiredSeats/cap);
+    const venueCapacity=Math.min(...venues.map(v=>Number(v.capacity)||cap));
+    const effectiveCap=Math.max(1,Math.min(cap,venueCapacity));
+    const neededBatches=Math.ceil(requiredSeats/effectiveCap);
     const people=allPeople.filter(p=>p.gender===g&&(isPres?["Presiding Officer","Senior APO"].includes(p.role):["APO","PO"].includes(p.role))&&!usedPeople.has(p.staff_id));
     const ordered=people.slice(0,requiredSeats);
     let participantIndex=0;
@@ -704,13 +717,13 @@ export default function App(){
      const sessionName=sessionNo===0?"Morning":"Evening";
      const sessionValue=String(venue.available_sessions||venue.source_data?.sessions||"Both").toLowerCase();
      if(sessionValue!=="both"&&sessionValue!==sessionName.toLowerCase())throw new Error("Venue "+venue.name+" is not available for the "+sessionName+" session.");
-     const targetSeats=Math.min(cap,Math.max(0,requiredSeats-bi*cap));
+     const targetSeats=Math.min(effectiveCap,Math.max(0,requiredSeats-bi*effectiveCap));
      const selected=ordered.slice(participantIndex,participantIndex+targetSeats);participantIndex+=selected.length;
      const trainers=trainerRecords.filter(t=>String(t.gender||"").toLowerCase()===g);
      if(!trainers.length)throw new Error("No "+gender+" master trainer is available for "+roleGroup+". Add a trainer before generating batches.");
      const trainer=trainers[bi%trainers.length];batchNumber++;
      const batch_data={generation_status:"Draft",required_seats:targetSeats,assigned_seats:selected.length,missing_staff_count:Math.max(0,targetSeats-selected.length),end_date:lastDate,duration_days:duration,session:sessionName,classroom:venue.classroom||venue.source_data?.classroom||venue.address,venue_name:venue.name,master_trainer_id:trainer.id,master_trainer_name:trainer.name,include_sunday:includeSunday};
-     batchesToSave.push({district_id:districtId,plan_id:plan.id,batch_number:batchNumber,training_date:batchDate,start_time:sessionNo===0?morningStart:eveningStart,end_time:sessionNo===0?morningEnd:eveningEnd,gender_group:gender,role_group:roleGroup,venue_id:venue.id,capacity:cap,batch_data});
+     batchesToSave.push({district_id:districtId,plan_id:plan.id,batch_number:batchNumber,training_date:batchDate,start_time:sessionNo===0?morningStart:eveningStart,end_time:sessionNo===0?morningEnd:eveningEnd,gender_group:gender,role_group:roleGroup,venue_id:venue.id,capacity:effectiveCap,batch_data});
      selected.forEach(p=>{usedPeople.add(p.staff_id);participantsToSave.push({plan_id:plan.id,batch_number:batchNumber,staff_id:p.staff_id,status:"Assigned",participant_data:{role:p.role,gender,staff_name:p.name,source:p.source,training_group:roleGroup}});});
     }
    }
@@ -918,21 +931,25 @@ export default function App(){
  const reserveSummary=useMemo(()=>{
   const sum=(key:string)=>calculated.reduce((n,s)=>n+Number((s as any)[key]||0),0);
   const roles=[{role:"Presiding Officer",male:"presMale",female:"presFemale"},{role:"Senior APO",male:"srapoMale",female:"srapoFemale"},{role:"APO",male:"apoMale",female:"apoFemale"},{role:"PO",male:"poMale",female:"poFemale"}];
-  const categories=roles.flatMap(r=>[{role:r.role,gender:"Male",duty:sum(r.male)},{role:r.role,gender:"Female",duty:sum(r.female)}]).map(x=>({...x,label:x.role+" — "+x.gender,reserve:Math.ceil(x.duty*0.05),training:x.duty+Math.ceil(x.duty*0.05)}));
-  return {categories,totalDuty:categories.reduce((n,x)=>n+x.duty,0),totalReserve:categories.reduce((n,x)=>n+x.reserve,0),totalTraining:categories.reduce((n,x)=>n+x.training,0)};
- },[calculated]);
+  const reservePercentRaw=Number(trainingDraft.reserve_percent??5);
+  const reservePercent=Number.isFinite(reservePercentRaw)&&reservePercentRaw>=0&&reservePercentRaw<=100?reservePercentRaw:5;
+  const categories=roles.flatMap(r=>[{role:r.role,gender:"Male",duty:sum(r.male)},{role:r.role,gender:"Female",duty:sum(r.female)}]).map(x=>({...x,label:x.role+" — "+x.gender,reserve:Math.ceil(x.duty*reservePercent/100),training:x.duty+Math.ceil(x.duty*reservePercent/100)}));
+  return {categories,reservePercent,totalDuty:categories.reduce((n,x)=>n+x.duty,0),totalReserve:categories.reduce((n,x)=>n+x.reserve,0),totalTraining:categories.reduce((n,x)=>n+x.training,0)};
+ },[calculated,trainingDraft]);
  const trainingProjection=useMemo(()=>{
   const value=(...keys:string[])=>{for(const k of keys){const n=Number(trainingDraft[k]);if(Number.isFinite(n)&&n>0)return n;}return 0;};
   const presSize=value("pres_batch_size","presiding_batch_size")||25;
   const apoSize=value("apo_batch_size","apo_po_batch_size")||40;
+  const poSize=value("po_batch_size")||apoSize;
+  const combinedApoPoSize=Math.min(apoSize,poSize);
   const role=(roleName:string,gender:"Male"|"Female")=>reserveSummary.categories.find(x=>x.role===roleName&&x.gender===gender)?.training||0;
   const groups=[
    {group:"Presiding / Senior APO",gender:"Male" as const,seats:role("Presiding Officer","Male")+role("Senior APO","Male"),size:presSize},
    {group:"Presiding / Senior APO",gender:"Female" as const,seats:role("Presiding Officer","Female")+role("Senior APO","Female"),size:presSize},
-   {group:"APO + PO combined",gender:"Male" as const,seats:role("APO","Male")+role("PO","Male"),size:apoSize},
-   {group:"APO + PO combined",gender:"Female" as const,seats:role("APO","Female")+role("PO","Female"),size:apoSize}
+   {group:"APO + PO combined",gender:"Male" as const,seats:role("APO","Male")+role("PO","Male"),size:combinedApoPoSize},
+   {group:"APO + PO combined",gender:"Female" as const,seats:role("APO","Female")+role("PO","Female"),size:combinedApoPoSize}
   ].map(x=>({...x,batches:Math.ceil(x.seats/x.size)}));
-  return {groups,presBatchSize:presSize,apoBatchSize:apoSize,totalSeats:groups.reduce((n,x)=>n+x.seats,0),totalBatches:groups.reduce((n,x)=>n+x.batches,0),parallelDays:Math.max(groups[0].batches,groups[1].batches)+Math.max(groups[2].batches,groups[3].batches)};
+  return {groups,presBatchSize:presSize,apoBatchSize:combinedApoPoSize,poBatchSize:poSize,totalSeats:groups.reduce((n,x)=>n+x.seats,0),totalBatches:groups.reduce((n,x)=>n+x.batches,0),parallelDays:Math.max(groups[0].batches,groups[1].batches)+Math.max(groups[2].batches,groups[3].batches)};
  },[trainingDraft,reserveSummary]);
  const staffSupply=useMemo(()=>{
   const read=(r:any,...keys:string[])=>{for(const k of keys){const v=r?.[k]??r?.source_data?.[k];if(v!==undefined&&v!==null&&String(v).trim()!=="")return String(v).trim();}return "";};
