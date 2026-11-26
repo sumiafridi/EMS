@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { supabase } from "./lib/supabase";
-import { buildStations, calculateDemand, type DataRow } from "./domain/election";
+import { calculateDemand, type DataRow, type Station } from "./domain/election";
 
 type District={id:string;name:string;code:string};
 type StationRow={id:string;tehsil_id:string|null;ps_number:string|null;nc_vc_ps_number:string|null;tehsil_ps_number:number|null;name:string;station_type:string|null;male_booths:number|null;female_booths:number|null;male_voters:number|null;female_voters:number|null;source_data:DataRow};
@@ -14,7 +14,7 @@ export default function App(){
  const [notice,setNotice]=useState("Connecting to Supabase…"),[busy,setBusy]=useState(false),[issues,setIssues]=useState<string[]>([]);
  const input=useRef<HTMLInputElement>(null);
  const activeDistrict=districts.find(d=>d.id===districtId);
- const calculated=useMemo(()=>calculateDemand(buildStations(rows)),[rows]);
+ const calculated=useMemo(()=>calculateDemand(stations.map((s,i):Station=>{const d=s.source_data||{};const tn=Number(s.tehsil_ps_number)||i+1;const cn=Number(s.nc_vc_ps_number||s.ps_number)||i+1;return {sNo:i+1,district:String(d.District??""),tehsil:String(d.Tehsil??""),councilType:String(d["Council Type (NC / VC)"]??""),councilNo:String(d["Council No"]??""),councilName:String(d["Council Name"]??""),psNo:String(s.nc_vc_ps_number||s.ps_number||""),stationName:s.name,psType:s.station_type||String(d["PS Type (Male / Female / Combined)"]??""),boothsMale:Number(s.male_booths??0),boothsFemale:Number(s.female_booths??0),maleVoters:Number(s.male_voters??0),femaleVoters:Number(s.female_voters??0),blockCount:0,blocks:[],tehsilStationNo:tn,ncVcStationNo:cn,tehsilPollingStationNo:tn,ncVcPollingStationNo:cn};})),[stations]);
  const demand=calculated.reduce((n,s)=>n+s.totalDemand,0);
 
  useEffect(()=>{supabase.auth.getSession().then(({data})=>setSession(data.session));const {data:{subscription}}=supabase.auth.onAuthStateChange((_e,s)=>setSession(s));return()=>subscription.unsubscribe();},[]);
