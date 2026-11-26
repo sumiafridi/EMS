@@ -10,7 +10,7 @@ const chunkSize=20;
 
 export default function App(){
  const [session,setSession]=useState<any>(null),[email,setEmail]=useState(""),[districts,setDistricts]=useState<District[]>([]),[districtId,setDistrictId]=useState(""),[section,setSection]=useState("Overview");
- const [rows,setRows]=useState<DataRow[]>([]),[stations,setStations]=useState<StationRow[]>([]),[counts,setCounts]=useState({tehsils:0,stations:0,blocks:0,allocations:0}),[opsCounts,setOpsCounts]=useState({staff:0,trainers:0,venues:0,rules:0,plans:0,settings:0,assignments:0,reserves:0,batches:0,participants:0,attendance:0});
+ const [rows,setRows]=useState<DataRow[]>([]),[stations,setStations]=useState<StationRow[]>([]),[counts,setCounts]=useState({tehsils:0,stations:0,blocks:0,allocations:0,allocatedBlocks:0}),[opsCounts,setOpsCounts]=useState({staff:0,trainers:0,venues:0,rules:0,plans:0,settings:0,assignments:0,reserves:0,batches:0,participants:0,attendance:0});
  const [staffRecords,setStaffRecords]=useState<any[]>([]),[trainerRecords,setTrainerRecords]=useState<any[]>([]),[venueRecords,setVenueRecords]=useState<any[]>([]),[assignmentRecords,setAssignmentRecords]=useState<any[]>([]),[reserveRecords,setReserveRecords]=useState<any[]>([]),[batchRecords,setBatchRecords]=useState<any[]>([]),[participantRecords,setParticipantRecords]=useState<any[]>([]),[attendanceRecords,setAttendanceRecords]=useState<any[]>([]),[ruleRecords,setRuleRecords]=useState<any[]>([]);
  const [notice,setNotice]=useState("Connecting to Supabase…"),[busy,setBusy]=useState(false),[issues,setIssues]=useState<string[]>([]);
  const input=useRef<HTMLInputElement>(null),legacyInput=useRef<HTMLInputElement>(null),uploadInput=useRef<HTMLInputElement>(null);
