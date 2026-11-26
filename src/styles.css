@@ -16,3 +16,10 @@
 .records-heading{margin-top:28px;padding-top:20px;border-top:1px solid #edf1f4}
 .upload-workspace .issue-box{margin:18px 0;max-width:none}
 @media(max-width:700px){.upload-workspace{padding:15px}.upload-workspace .panel-head{display:block}.upload-actions{align-items:stretch}.upload-actions .btn{flex:1}.upload-workspace .tag{display:inline-block;margin-top:12px}}
+
+.voter-bar-row{padding:11px 2px;border-bottom:1px solid #edf1f4}
+.voter-bar-row>div:first-child{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:#5d7183}
+.voter-bar-row b{font:800 13px Manrope;color:#173a55}
+.voter-bar{height:7px;background:#edf2f5;border-radius:8px;overflow:hidden;margin:8px 0 5px}
+.voter-bar i{display:block;height:100%;background:#159b8d;border-radius:8px}
+.voter-bar-row small{font-size:10px;color:#8a9aaa}
