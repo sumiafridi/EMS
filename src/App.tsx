@@ -368,7 +368,7 @@ export default function App(){
    const parsed=selected.matrix.slice(selected.headerIndex+1).filter((r:any[])=>r.some(v=>String(v??"").trim()!=="")).map((r:any[])=>{
     const rawRow:any={};selected.rawHeaders.forEach((h:string,j:number)=>{if(h)rawRow[h]=r[j]??"";});
     const canonical:any={};for(const h of cfg.headers){const idx=mapping[h];if(idx>=0)canonical[h]=r[idx]??"";}
-    return {...rawRow,...canonical};
+    const merged={...rawRow,...canonical};if(merged.Gender!==undefined){const g=String(merged.Gender).trim().toLowerCase();if(g==="m")merged.Gender="Male";else if(g==="f")merged.Gender="Female";else if(g==="male")merged.Gender="Male";else if(g==="female")merged.Gender="Female";}return merged;
    });
    if(!parsed.length)throw new Error("No data rows found under the detected headings.");
    const warnings:string[]=[];if(missing.length)warnings.push("Missing required headings: "+missing.join(", ")+". Rows missing those values will be held for correction; no column positions will be guessed.");
