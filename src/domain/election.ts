@@ -118,8 +118,8 @@ export function buildStations(dataRows: DataRow[]): Station[] {
  * are authoritative; otherwise the audited legacy defaults are used.
  * Naib Qasid remains excluded, matching the original app's allocation policy.
  */
-export function calculateDemand(stations: Station[], rules: any[] = []): DemandStation[] {
-  const normalizedRules = rules.map((r) => Array.isArray(r) ? {
+export function calculateDemand(stations: Station[], rules?: any[]): DemandStation[] {
+  const normalizedRules = (rules || []).map((r) => Array.isArray(r) ? {
     role: str(r[0]), stationType: str(r[1]), gender: str(r[2]), basis: str(r[3]),
     perUnit: num(r[4]), adjustment: r[5] === "" || r[5] == null ? 0 : num(r[5]),
   } : {
@@ -155,7 +155,7 @@ export function calculateDemand(stations: Station[], rules: any[] = []): DemandS
   return stations.map((station) => {
     let presMale: number, presFemale: number, srapoMale: number, srapoFemale: number;
     let apoMale: number, apoFemale: number, poMale: number, poFemale: number;
-    if (normalizedRules.length) {
+    if (rules !== undefined) {
       presMale = fromRules(station, "Presiding Officer", "Male");
       presFemale = fromRules(station, "Presiding Officer", "Female");
       srapoMale = fromRules(station, "Senior APO", "Male");
