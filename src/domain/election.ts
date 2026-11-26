@@ -113,23 +113,69 @@ export function buildStations(dataRows: DataRow[]): Station[] {
 }
 
 /**
- * Mirrors calcDemand() in the audited legacy source.
- * IMPORTANT: Combined-station female APO uses 3 × female booths (no -1).
- * Naib Qasid demand is deliberately zero in the audited source.
+ * Mirrors the legacy calcDemand() rules. If district rules are supplied, they
+ * are authoritative; otherwise the audited legacy defaults are used.
+ * Naib Qasid remains excluded, matching the original app's allocation policy.
  */
-export function calculateDemand(stations: Station[]): DemandStation[] {
+export function calculateDemand(stations: Station[], rules: any[] = []): DemandStation[] {
+  const normalizedRules = rules.map((r) => Array.isArray(r) ? {
+    role: str(r[0]), stationType: str(r[1]), gender: str(r[2]), basis: str(r[3]),
+    perUnit: num(r[4]), adjustment: r[5] === "" || r[5] == null ? 0 : num(r[5]),
+  } : {
+    role: str(r["Duty Role"] ?? r.role), stationType: str(r["Station Type"] ?? r.station_type),
+    gender: str(r["Required Gender"] ?? r.gender), basis: str(r.Basis ?? r.basis),
+    perUnit: num(r["Posts per Unit"] ?? r.per_unit),
+    adjustment: r["Adjustment per Station"] === "" || r["Adjustment per Station"] == null
+      ? (r.adjustment == null ? 0 : num(r.adjustment))
+      : num(r["Adjustment per Station"]),
+  }).filter((r) => r.role && r.stationType && r.gender);
+
+  const ruleAliases: Record<string, string[]> = {
+    "Presiding Officer": ["presiding officer", "presiding"],
+    "Senior APO": ["senior assistant presiding officer", "senior apo", "srapo"],
+    "APO": ["assistant presiding officer", "apo"],
+    "Polling Officer": ["polling officer", "po"],
+  };
+  const fromRules = (station: Station, role: string, gender: string): number => {
+    const aliases = ruleAliases[role] || [role.toLowerCase()];
+    const rule = normalizedRules.find((r) =>
+      aliases.includes(r.role.toLowerCase()) &&
+      r.stationType.toLowerCase() === station.psType.toLowerCase() &&
+      r.gender.toLowerCase() === gender.toLowerCase()
+    );
+    if (!rule) return 0;
+    const basis = rule.basis.toLowerCase();
+    const units = basis === "station" ? 1
+      : basis === "male booth" ? station.boothsMale
+      : basis === "female booth" ? station.boothsFemale : 0;
+    return Math.max(0, Math.round(rule.perUnit * units + rule.adjustment));
+  };
+
   return stations.map((station) => {
-    const isMale = station.psType === "Male";
-    const isFemale = station.psType === "Female";
-    const isCombined = station.psType === "Combined";
-    const presMale = isMale || isCombined ? 1 : 0;
-    const presFemale = isFemale ? 1 : 0;
-    const srapoMale = isMale || isCombined ? 1 : 0;
-    const srapoFemale = isFemale ? 1 : 0;
-    const apoMale = isMale || isCombined ? Math.max(0, 3 * station.boothsMale - 1) : 0;
-    const apoFemale = isFemale ? Math.max(0, 3 * station.boothsFemale - 1) : isCombined ? 3 * station.boothsFemale : 0;
-    const poMale = isMale || isCombined ? station.boothsMale : 0;
-    const poFemale = isFemale || isCombined ? station.boothsFemale : 0;
+    let presMale: number, presFemale: number, srapoMale: number, srapoFemale: number;
+    let apoMale: number, apoFemale: number, poMale: number, poFemale: number;
+    if (normalizedRules.length) {
+      presMale = fromRules(station, "Presiding Officer", "Male");
+      presFemale = fromRules(station, "Presiding Officer", "Female");
+      srapoMale = fromRules(station, "Senior APO", "Male");
+      srapoFemale = fromRules(station, "Senior APO", "Female");
+      apoMale = fromRules(station, "APO", "Male");
+      apoFemale = fromRules(station, "APO", "Female");
+      poMale = fromRules(station, "Polling Officer", "Male");
+      poFemale = fromRules(station, "Polling Officer", "Female");
+    } else {
+      const isMale = station.psType === "Male";
+      const isFemale = station.psType === "Female";
+      const isCombined = station.psType === "Combined";
+      presMale = isMale || isCombined ? 1 : 0;
+      presFemale = isFemale ? 1 : 0;
+      srapoMale = isMale || isCombined ? 1 : 0;
+      srapoFemale = isFemale ? 1 : 0;
+      apoMale = isMale || isCombined ? Math.max(0, 3 * station.boothsMale - 1) : 0;
+      apoFemale = isFemale ? Math.max(0, 3 * station.boothsFemale - 1) : isCombined ? 3 * station.boothsFemale : 0;
+      poMale = isMale || isCombined ? station.boothsMale : 0;
+      poFemale = isFemale || isCombined ? station.boothsFemale : 0;
+    }
     const nqMale = 0 as const;
     const nqFemale = 0 as const;
     const totalDemand = presMale + presFemale + srapoMale + srapoFemale + apoMale + apoFemale + poMale + poFemale;
