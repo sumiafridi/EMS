@@ -17,7 +17,6 @@ export default function App(){
  const [uploadFileName,setUploadFileName]=useState("");
  const [uploadWarnings,setUploadWarnings]=useState<string[]>([]);
  const [uploadRecords,setUploadRecords]=useState<any[]>([]);
- const uploadKinds=["Staff Data","Master Trainers","Training Venues","Demand Rules","Training Plans","District Settings"];
  const uploadConfig:Record<string,{table:string;title:string;description:string;headers:string[];required:string[]}> = {
   "Staff Data":{table:"election_staff",title:"Staff Data / Employee Roster",description:"Import the complete employee roster. CNIC is used as the main identity; source S.No is retained as a fallback. Original BPS and all source columns are preserved.",headers:["S.No","Tehsil","Name of Officer/Official","Gender","CNIC #","Department","Designation","BPS","Place of Posting","Qualification","Date of Retirement","Mobile #","Availability (Y/N)"],required:["Tehsil","Name of Officer/Official","Gender"]},
   "Master Trainers":{table:"master_trainers",title:"Master Trainers",description:"Upload male and female master trainers. CNIC is used to update an existing trainer instead of creating duplicates.",headers:["Master Trainer Name","Gender","Designation","Department","BPS","CNIC","Mobile Number"],required:["Master Trainer Name","Gender"]},
@@ -109,7 +108,7 @@ export default function App(){
    const missing=cfg.required.filter(h=>!(aliases[h]||[h]).some(a=>headers.includes(a)));
    const warnings:string[]=[];
    if(missing.length)warnings.push("Expected headings not found: "+missing.join(", ")+". The importer will still preserve the rows and map available columns.");
-   parsed.forEach((r:any,i:number)=>{cfg.required.forEach(h=>{if(!String(r[h]??"").trim())warnings.push("Row "+(headerIndex+i+2)+": "+h+" is blank.");});});
+   parsed.forEach((r:any,i:number)=>{cfg.required.forEach(h=>{const aliases:Record<string,string[]>={"Master Trainer Name":["Master Trainer Name","Name","name"],"Venue Name":["Venue Name","venue_name","Name"],"Classroom Name/No.":["Classroom Name/No.","Classroom","classroom"],"Setting Key":["Setting Key","Key","setting_key"]};if(!String(pick(r,...(aliases[h]||[h])).trim())warnings.push("Row "+(headerIndex+i+2)+": "+h+" is blank.");});});
    if(kind==="Staff Data"){
     const db=await supabase.from("election_tehsils").select("name").eq("district_id",districtId);
     const known=new Set((db.data||[]).map(x=>norm(x.name)));
