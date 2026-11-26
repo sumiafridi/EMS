@@ -6,7 +6,7 @@ import { buildStations, calculateDemand, type DataRow } from "./domain/election"
 type District={id:string;name:string;code:string};
 type StationRow={id:string;tehsil_id:string|null;ps_number:string|null;name:string;station_type:string|null;male_booths:number|null;female_booths:number|null;male_voters:number|null;female_voters:number|null;source_data:DataRow};
 const required=["Tehsil","Council Type (NC / VC)","Council No","PS No","PS Type (Male / Female / Combined)","Census Block Code"];
-const chunkSize=100;
+const chunkSize=20;
 
 export default function App(){
  const [session,setSession]=useState<any>(null),[email,setEmail]=useState(""),[districts,setDistricts]=useState<District[]>([]),[districtId,setDistrictId]=useState(""),[section,setSection]=useState("Overview");
