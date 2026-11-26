@@ -157,8 +157,8 @@ export default function App(){
     const settingKey=String(kind==="Training Settings"?pick(r,"Training Setting Key","setting_key"):pick(r,"Setting Key","Key","setting_key")||"").trim();return { ...(old?.id?{id:old.id}:{}),district_id:districtId,setting_key:(kind==="Training Settings"?"training:":"")+settingKey,setting_value:kind==="Training Settings"?pick(r,"Training Setting Value","Value","setting_value"):pick(r,"Setting Value","Value","setting_value")};
    }).filter((r:any)=>kind!=="Demand Rules"||!!r.role).filter((r:any)=>kind!=="Training Plans"||!!r.plan_type).filter((r:any)=>!["District Settings","Training Settings"].includes(kind)||!!r.setting_key);
    let sent=0;
-   for(let i=0;i<prepared.length;i+=100){
-    const part=prepared.slice(i,i+100);const {error}=await (supabase as any).from(cfg.table).upsert(part,{onConflict:"id"});
+   for(let i=0;i<prepared.length;i+=250){
+    const part=prepared.slice(i,i+250);const {error}=await (supabase as any).from(cfg.table).upsert(part,{onConflict:"id"});
     if(error)throw new Error("Rows "+(i+1)+"–"+(i+part.length)+": "+error.message);
     sent+=part.length;setNotice("Imported "+sent.toLocaleString()+" / "+prepared.length.toLocaleString()+" "+kind+" records…");
    }
@@ -227,25 +227,25 @@ export default function App(){
    fillRole("PO","APO/PO",seniorPool);
    if(!generated.length&&demand>0)throw new Error("No eligible staff could be assigned. Check staff gender, Tehsil, availability and numeric BPS values.");
    const insertedIds:string[]=[];
-   for(let i=0;i<generated.length;i+=100){
-    const part=generated.slice(i,i+100);const {data,error}=await supabase.from("staff_assignments").insert(part).select("id");
+   for(let i=0;i<generated.length;i+=250){
+    const part=generated.slice(i,i+250);const {data,error}=await supabase.from("staff_assignments").insert(part).select("id");
     if(error)throw new Error("Assignment rows "+(i+1)+"–"+(i+part.length)+" failed: "+error.message);
     insertedIds.push(...(data||[]).map((x:any)=>x.id));setNotice("Saving duty assignments: "+insertedIds.length.toLocaleString()+" / "+generated.length.toLocaleString()+"…");
    }
    if(insertedIds.length){
     const oldActive=await supabase.from("staff_assignments").update({assignment_status:"Superseded"}).eq("district_id",districtId).eq("assignment_status","Active");
     if(oldActive.error)throw new Error("New assignments are saved as Draft, but old active assignments could not be archived: "+oldActive.error.message);
-    for(let i=0;i<insertedIds.length;i+=100){const {error}=await supabase.from("staff_assignments").update({assignment_status:"Active"}).in("id",insertedIds.slice(i,i+100));if(error)throw new Error("Could not activate the new assignment batch: "+error.message);}
+    for(let i=0;i<insertedIds.length;i+=250){const {error}=await supabase.from("staff_assignments").update({assignment_status:"Active"}).in("id",insertedIds.slice(i,i+250));if(error)throw new Error("Could not activate the new assignment batch: "+error.message);}
    }
    const reserveTargets=reserveSummary.categories;
    const reserveGenerated:any[]=[];
    const reserveCandidate=(role:string,gender:string)=>{const pools=role==="Presiding Officer"||role==="Senior APO"?[seniorPool]:[juniorPool,seniorPool];for(const pool of pools){const found=pool.find((r:any)=>!used.has(r.id)&&r.gender===gender);if(found)return found;}return null;};
    for(const target of reserveTargets){for(let n=0;n<target.reserve;n++){const staff=reserveCandidate(target.role,target.gender);if(!staff)break;used.add(staff.id);reserveGenerated.push({district_id:districtId,staff_id:staff.id,reserve_role:target.role,reserve_status:"Draft",reserve_data:{gender:staff.gender,bps_text:staff.rawBps,home_tehsil:staff.tehsil,source:"automatic 5% reserve allocation"}});}}
    const reserveIds:string[]=[];
-   for(let i=0;i<reserveGenerated.length;i+=100){const {data,error}=await supabase.from("reserve_staff").insert(reserveGenerated.slice(i,i+100)).select("id");if(error)throw new Error("Duty assignments were saved, but reserve rows could not be saved: "+error.message);reserveIds.push(...(data||[]).map((x:any)=>x.id));}
+   for(let i=0;i<reserveGenerated.length;i+=250){const {data,error}=await supabase.from("reserve_staff").insert(reserveGenerated.slice(i,i+250)).select("id");if(error)throw new Error("Duty assignments were saved, but reserve rows could not be saved: "+error.message);reserveIds.push(...(data||[]).map((x:any)=>x.id));}
    const oldReserve=await supabase.from("reserve_staff").update({reserve_status:"Superseded"}).eq("district_id",districtId).eq("reserve_status","Available");
    if(oldReserve.error)throw new Error("Assignments saved, but previous reserve records could not be archived: "+oldReserve.error.message);
-   for(let i=0;i<reserveIds.length;i+=100){const {error}=await supabase.from("reserve_staff").update({reserve_status:"Available"}).in("id",reserveIds.slice(i,i+100));if(error)throw new Error("Assignments saved, but the new reserve pool could not be activated: "+error.message);}
+   for(let i=0;i<reserveIds.length;i+=250){const {error}=await supabase.from("reserve_staff").update({reserve_status:"Available"}).in("id",reserveIds.slice(i,i+250));if(error)throw new Error("Assignments saved, but the new reserve pool could not be activated: "+error.message);}
    const unfilled=Math.max(0,demand-generated.length),cross=generated.filter(x=>x.assignment_data.is_cross_tehsil).length;
    await loadDistrictData();
    setNotice("Duty calculation completed. Assigned "+generated.length.toLocaleString()+" of "+demand.toLocaleString()+" required posts; "+unfilled.toLocaleString()+" remain vacant. Cross-Tehsil assignments: "+cross.toLocaleString()+". Added "+reserveGenerated.length.toLocaleString()+" reserve staff against a 5% target of "+reserveSummary.totalReserve.toLocaleString()+". Non-numeric BPS, unavailable, incomplete or gender/Tehsil-mismatched staff were not guessed or assigned.");
