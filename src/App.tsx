@@ -10,9 +10,9 @@ const chunkSize=20;
 
 export default function App(){
  const [session,setSession]=useState<any>(null),[email,setEmail]=useState(""),[districts,setDistricts]=useState<District[]>([]),[districtId,setDistrictId]=useState(""),[section,setSection]=useState("Overview");
- const [rows,setRows]=useState<DataRow[]>([]),[stations,setStations]=useState<StationRow[]>([]),[counts,setCounts]=useState({tehsils:0,stations:0,blocks:0,allocations:0});
+ const [rows,setRows]=useState<DataRow[]>([]),[stations,setStations]=useState<StationRow[]>([]),[counts,setCounts]=useState({tehsils:0,stations:0,blocks:0,allocations:0}),[opsCounts,setOpsCounts]=useState({staff:0,trainers:0,venues:0,rules:0,plans:0});
  const [notice,setNotice]=useState("Connecting to Supabase…"),[busy,setBusy]=useState(false),[issues,setIssues]=useState<string[]>([]);
- const input=useRef<HTMLInputElement>(null);
+ const input=useRef<HTMLInputElement>(null),legacyInput=useRef<HTMLInputElement>(null);
  const activeDistrict=districts.find(d=>d.id===districtId);
  const calculated=useMemo(()=>calculateDemand(stations.map((s,i):Station=>{const d=s.source_data||{};const tn=Number(s.tehsil_ps_number)||i+1;const cn=Number(s.nc_vc_ps_number||s.ps_number)||i+1;return {sNo:i+1,district:String(d.District??""),tehsil:String(d.Tehsil??""),councilType:String(d["Council Type (NC / VC)"]??""),councilNo:String(d["Council No"]??""),councilName:String(d["Council Name"]??""),psNo:String(s.nc_vc_ps_number||s.ps_number||""),sourceTehsilPsNo:String(d["Tehsil PS No"]??""),sourceNcVcPsNo:String(d["NC/VC PS No"]??""),stationName:s.name,psType:s.station_type||String(d["PS Type (Male / Female / Combined)"]??""),boothsMale:Number(s.male_booths??0),boothsFemale:Number(s.female_booths??0),maleVoters:Number(s.male_voters??0),femaleVoters:Number(s.female_voters??0),blockCount:0,blocks:[],tehsilStationNo:tn,ncVcStationNo:cn,tehsilPollingStationNo:tn,ncVcPollingStationNo:cn};})),[stations]);
  const demand=calculated.reduce((n,s)=>n+s.totalDemand,0);
@@ -41,17 +41,23 @@ export default function App(){
  async function loadDistricts(){const {data,error}=await supabase.from("districts").select("id,name,code").eq("is_active",true).order("name");if(error){setNotice("District access error: "+error.message);return;}setDistricts(data||[]);if(!districtId&&data?.length)setDistrictId(data.find(d=>d.name==="Kohat")?.id||data[0].id);}
  async function loadDistrictData(){
   setNotice("Loading district records from Supabase…");
-  const [t,c,s,b,a]=await Promise.all([
+  const [t,c,s,b,a,staffCount,trainerCount,venueCount,ruleCount,planCount]=await Promise.all([
    supabase.from("election_tehsils").select("id",{count:"exact",head:true}).eq("district_id",districtId),
    supabase.from("election_councils").select("id",{count:"exact",head:true}).eq("district_id",districtId),
    supabase.from("polling_stations").select("id,tehsil_id,ps_number,nc_vc_ps_number,tehsil_ps_number,name,station_type,male_booths,female_booths,male_voters,female_voters,source_data",{count:"exact"}).eq("district_id",districtId).limit(2000),
    supabase.from("census_blocks").select("id,source_data",{count:"exact"}).eq("district_id",districtId).limit(5000),
-   supabase.from("block_station_allocations").select("id",{count:"exact",head:true}).eq("district_id",districtId)
+   supabase.from("block_station_allocations").select("id",{count:"exact",head:true}).eq("district_id",districtId),
+   supabase.from("election_staff").select("id",{count:"exact",head:true}).eq("district_id",districtId),
+   supabase.from("master_trainers").select("id",{count:"exact",head:true}).eq("district_id",districtId),
+   supabase.from("training_venues").select("id",{count:"exact",head:true}).eq("district_id",districtId),
+   supabase.from("demand_rules").select("id",{count:"exact",head:true}).eq("district_id",districtId),
+   supabase.from("training_plans").select("id",{count:"exact",head:true}).eq("district_id",districtId)
   ]);
-  const err=[t.error,c.error,s.error,b.error,a.error].find(Boolean);if(err){setNotice("Could not load district data: "+err.message);return;}
+  const err=[t.error,c.error,s.error,b.error,a.error,staffCount.error,trainerCount.error,venueCount.error,ruleCount.error,planCount.error].find(Boolean);if(err){setNotice("Could not load district data: "+err.message);return;}
   setStations((s.data||[]) as StationRow[]);
   setRows((b.data||[]).map(x=>x.source_data as DataRow).filter(Boolean));
   setCounts({tehsils:t.count||0,stations:s.count||0,blocks:b.count||0,allocations:a.count||0});
+  setOpsCounts({staff:staffCount.count||0,trainers:trainerCount.count||0,venues:venueCount.count||0,rules:ruleCount.count||0,plans:planCount.count||0});
   setNotice("Connected to Supabase · "+(activeDistrict?.name||"District")+" data loaded from PostgreSQL.");
  }
  function downloadTemplate(){const headers=["District","Tehsil No","Tehsil","Tehsil PS No","NC/VC No","Council Type (NC / VC)","Council Name","NC/VC PS No","PS No","No & Name of Polling Station","PS Type (Male / Female / Combined)","Booths Male","Booths Female","Male Voters (block)","Female Voters (block)","Census Block Code","Electoral Area name"];const ws=XLSX.utils.aoa_to_sheet([headers]);ws["!cols"]=headers.map(h=>({wch:Math.max(16,h.length+2)}));const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,ws,"DATA Template");XLSX.writeFile(book,"KPK_Election_DATA_Template.xlsx");}
@@ -86,6 +92,89 @@ export default function App(){
    setSection("Overview");
   }catch(e){setNotice("Import stopped: "+(e instanceof Error?e.message:String(e))+" Data already committed in earlier batches, if any. Re-upload is safe because the database import uses district/source keys.");}
   finally{setBusy(false);if(input.current)input.current.value="";}
+ }
+
+
+ async function importLegacyBackup(file?:File){
+  if(!file||!districtId)return;
+  setBusy(true);setIssues([]);setNotice("Reading original Kohat HTML backup…");
+  try{
+   const html=await file.text();
+   const match=html.match(/const\\s+DEFAULT_DATA\\s*=\\s*(\\{[\\s\\S]*?\\});\\s*<\\/script>/);
+   if(!match)throw new Error("This file does not contain the original DEFAULT_DATA backup. Select the saved Kohat HTML version, not the deployed website.");
+   const payload=JSON.parse(match[1]);
+   const dataRows=payload?.data?.rows||[],staffRows=payload?.staff?.rows||[],trainerRows=payload?.master_trainers||[],venueRows=payload?.training_venues||[];
+   const districtName=String(dataRows[0]?.District||payload?.settings?.["District (auto from DATA)"]||"").trim();
+   if(districtName.toLowerCase()!==(activeDistrict?.name||"").toLowerCase())throw new Error("Backup district is "+(districtName||"unspecified")+", but the selected workspace is "+(activeDistrict?.name||"unspecified")+". Select Kohat before importing.");
+   if(!dataRows.length||!staffRows.length)throw new Error("Backup is incomplete: DATA and Staff sheets must both contain records.");
+   if(!confirm("Import operational records from "+file.name+" into "+activeDistrict?.name+"?\\n\\nDATA source rows detected: "+dataRows.length.toLocaleString()+" (existing DATA will not be overwritten)\\nStaff: "+staffRows.length.toLocaleString()+"\\nMaster trainers: "+trainerRows.length+"\\nVenue/classroom records: "+venueRows.length+"\\n\\nExisting records are preserved; matching CNICs and existing settings are skipped."))return;
+   const {data:tehsilRows,error:tehsilError}=await supabase.from("election_tehsils").select("id,name").eq("district_id",districtId);
+   if(tehsilError)throw tehsilError;
+   const tehsilIds=new Map((tehsilRows||[]).map(x=>[String(x.name).trim().toLowerCase(),x.id]));
+   const chunkInsert=async(table:string,records:any[],label:string)=>{
+    let added=0;
+    for(let i=0;i<records.length;i+=100){
+     const part=records.slice(i,i+100);
+     const {error}=await (supabase as any).from(table).insert(part);
+     if(error)throw new Error(label+" rows "+(i+1)+"–"+(i+part.length)+" failed: "+error.message);
+     added+=part.length;setNotice("Imported "+label+": "+added.toLocaleString()+" / "+records.length.toLocaleString()+"…");
+    }
+    return added;
+   };
+   const {data:existingStaff,error:existingStaffError}=await supabase.from("election_staff").select("cnic,source_staff_id").eq("district_id",districtId).limit(10000);
+   if(existingStaffError)throw existingStaffError;
+   const staffKeys=new Set((existingStaff||[]).map(x=>String(x.cnic||"").trim()).filter(Boolean));
+   const incomingKeys=new Set<string>();
+   const staffToInsert=staffRows.filter((r:any)=>{
+    const cnic=String(r["CNIC #"]??r.CNIC??"").trim();
+    const key=cnic||("source:"+String(r["S.No"]??""));
+    if(incomingKeys.has(key)|| (cnic&&staffKeys.has(cnic)))return false;
+    incomingKeys.add(key);return true;
+   }).map((r:any)=>({
+    district_id:districtId,tehsil_id:tehsilIds.get(String(r.Tehsil??"").trim().toLowerCase())||null,
+    source_staff_id:String(r["S.No"]??"").trim()||null,name:String(r["Name of Officer/Official"]??"").trim()||null,
+    gender:String(r.Gender??"").trim()||null,cnic:String(r["CNIC #"]??"").trim()||null,mobile:String(r["Mobile #"]??"").trim()||null,
+    department:String(r.Department??"").trim()||null,designation:String(r.Designation??"").trim()||null,
+    bps_text:String(r.BPS??"").trim()||null,availability:String(r["Availability (Y/N)"]??"").trim()||null,source_data:r
+   }));
+   const staffAdded=await chunkInsert("election_staff",staffToInsert,"staff");
+   const {data:existingTrainers,error:trainerErr}=await supabase.from("master_trainers").select("cnic").eq("district_id",districtId).limit(1000);
+   if(trainerErr)throw trainerErr;
+   const trainerKeys=new Set((existingTrainers||[]).map(x=>String(x.cnic||"").trim()).filter(Boolean));
+   const trainerToInsert=trainerRows.filter((r:any)=>!r.cnic||!trainerKeys.has(String(r.cnic).trim())).map((r:any)=>({district_id:districtId,name:String(r.name??"").trim()||null,gender:String(r.gender??"").trim()||null,cnic:String(r.cnic??"").trim()||null,mobile:String(r.mobile??"").trim()||null,source_data:r}));
+   const trainersAdded=await chunkInsert("master_trainers",trainerToInsert,"master trainers");
+   const {data:existingVenues,error:venueErr}=await supabase.from("training_venues").select("name,address,source_data").eq("district_id",districtId).limit(1000);
+   if(venueErr)throw venueErr;
+   const venueKey=(r:any)=>[String(r.gender??"").trim().toLowerCase(),String(r.venue_name??r.name??"").trim().toLowerCase(),String(r.classroom??"").trim().toLowerCase()].join("|");
+   const venueKeys=new Set((existingVenues||[]).map((r:any)=>venueKey(r.source_data||{})));
+   const venueToInsert=venueRows.filter((r:any)=>!venueKeys.has(venueKey(r))).map((r:any)=>({district_id:districtId,name:String(r.venue_name??r.name??"Unspecified").trim(),address:[r.venue_name,r.classroom,r.gender].filter(Boolean).join(" · "),capacity:Number.isFinite(Number(r.capacity))?Number(r.capacity):null,source_data:r}));
+   const venuesAdded=await chunkInsert("training_venues",venueToInsert,"training venues");
+   const {data:existingSettings,error:settingsErr}=await supabase.from("district_settings").select("setting_key").eq("district_id",districtId).limit(1000);
+   if(settingsErr)throw settingsErr;
+   const settingKeys=new Set((existingSettings||[]).map(x=>x.setting_key));
+   const settingRows=Object.entries(payload.settings||{}).filter(([k])=>!settingKeys.has(k)).map(([setting_key,setting_value])=>({district_id:districtId,setting_key,setting_value}));
+   const trainingSettingRows=Object.entries(payload.training_settings||{}).filter(([k])=>!settingKeys.has("training:"+k)).map(([k,v])=>({district_id:districtId,setting_key:"training:"+k,setting_value:v}));
+   const settingsAdded=await chunkInsert("district_settings",[...settingRows,...trainingSettingRows],"district settings");
+   const ruleRows=(payload.rules||[]).slice(1).map((r:any[])=>Object.fromEntries((payload.rules[0]||[]).map((h:string,i:number)=>[h,r[i]])));
+   const {data:existingRules,error:rulesErr}=await supabase.from("demand_rules").select("rule_data").eq("district_id",districtId).limit(1000);
+   if(rulesErr)throw rulesErr;
+   const ruleKeys=new Set((existingRules||[]).map((r:any)=>String(r.rule_data?.["Rule Key"]??"")));
+   const rulesToInsert=ruleRows.filter((r:any)=>!ruleKeys.has(String(r["Rule Key"]??""))).map((r:any)=>({district_id:districtId,role:String(r["Duty Role"]??""),station_type:String(r["Station Type"]??"")||null,gender:String(r["Required Gender"]??"")||null,basis:String(r.Basis??"")||null,per_unit:Number(r["Posts per Unit"])||0,adjustment:r["Adjustment per Station"]===""||r["Adjustment per Station"]==null?null:Number(r["Adjustment per Station"]),is_active:true,rule_data:r}));
+   const rulesAdded=await chunkInsert("demand_rules",rulesToInsert,"demand rules");
+   const {data:existingPlans,error:plansErr}=await supabase.from("training_plans").select("plan_type").eq("district_id",districtId).limit(100);
+   if(plansErr)throw plansErr;
+   const planTypes=new Set((existingPlans||[]).map(x=>x.plan_type));
+   const ts=payload.training_settings||{};
+   const planSpecs=[
+    {plan_type:"presiding_srapo",name:"Presiding Officers / Senior APOs",start_date:ts.pres_start_date||null,end_date:ts.pres_end_date||null,duration_days:Number(ts.pres_duration_days)||null,batch_capacity:Number(ts.pres_batch_size)||null,plan_data:{...ts,category:"Presiding Officers / Senior APOs"}},
+    {plan_type:"apo_po",name:"APO / PO Combined Training",start_date:ts.apo_start_date||null,end_date:ts.apo_end_date||null,duration_days:Number(ts.apo_duration_days)||null,batch_capacity:Number(ts.apo_batch_size)||null,plan_data:{...ts,category:"APO + PO combined"}}
+   ].filter(p=>!planTypes.has(p.plan_type)).map(p=>({...p,district_id:districtId}));
+   const plansAdded=await chunkInsert("training_plans",planSpecs,"training plans");
+   await loadDistrictData();
+   setSection("Overview");
+   setNotice("Kohat operational backup imported safely. Added "+staffAdded.toLocaleString()+" staff, "+trainersAdded+" trainers, "+venuesAdded+" venue/classroom records, "+rulesAdded+" demand rules, "+settingsAdded+" settings and "+plansAdded+" training plans. Existing DATA and existing records were preserved; re-upload skips matching CNICs and settings.");
+  }catch(e){setNotice("Operational import stopped: "+(e instanceof Error?e.message:String(e))+". Successfully committed earlier batches are retained; run the same import again to resume safely.");}
+  finally{setBusy(false);if(legacyInput.current)legacyInput.current.value="";}
  }
 
  const dashboard=useMemo(()=>{
@@ -139,7 +228,7 @@ export default function App(){
  const stationTypeCounts={male:stations.filter(s=>String(s.station_type||s.source_data?.["PS Type (Male / Female / Combined)"]||"").toLowerCase()==="male").length,female:stations.filter(s=>String(s.station_type||s.source_data?.["PS Type (Male / Female / Combined)"]||"").toLowerCase()==="female").length,combined:stations.filter(s=>String(s.station_type||s.source_data?.["PS Type (Male / Female / Combined)"]||"").toLowerCase()==="combined").length};
  const showDemand=rows.length?demand:0;
  if(!session)return <div className="auth-screen"><div className="auth-card"><div className="brand-mark">E</div><h1>KPK Election EMS</h1><p>Secure district access · Supabase cloud database</p><label>Email address<input value={email} onChange={e=>setEmail(e.target.value)} type="email" placeholder="Your authorized account email"/></label><button className="btn primary" disabled={busy} onClick={sendLogin}>{busy?"Sending…":"Send secure sign-in link"}</button><small>Only authorized EMS accounts can access district records.</small><div className="notice">{notice}</div></div></div>;
- return <div className="app"><aside className="sidebar"><div className="brand"><div className="brand-mark">E</div><div><b>KPK Election</b><small>Management System</small></div></div><div className="district-label">ACTIVE WORKSPACE</div><select className="district-select" value={districtId} onChange={e=>setDistrictId(e.target.value)}>{districts.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select><nav>{["Overview","DATA Import","Polling Stations","Staff Demand","Relations Check"].map(s=><button key={s} className={section===s?"nav active":"nav"} onClick={()=>setSection(s)}>{s}</button>)}</nav><div className="side-foot"><span className="dot"></span> Supabase connected<small>{session.user.email}</small><button className="signout" onClick={()=>supabase.auth.signOut()}>Sign out</button></div></aside>
+ return <div className="app"><aside className="sidebar"><div className="brand"><div className="brand-mark">E</div><div><b>KPK Election</b><small>Management System</small></div></div><div className="district-label">ACTIVE WORKSPACE</div><select className="district-select" value={districtId} onChange={e=>setDistrictId(e.target.value)}>{districts.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select><nav>{["Overview","DATA Import","Staff & Training Import","Polling Stations","Staff Demand","Relations Check"].map(s=><button key={s} className={section===s?"nav active":"nav"} onClick={()=>setSection(s)}>{s}</button>)}</nav><div className="side-foot"><span className="dot"></span> Supabase connected<small>{session.user.email}</small><button className="signout" onClick={()=>supabase.auth.signOut()}>Sign out</button></div></aside>
  <main className="main"><header><div><div className="eyebrow">ELECTION OPERATIONS / CLOUD DATABASE</div><h1>{section}</h1></div><div className="header-actions"><span className="local-pill">POSTGRESQL LIVE</span><button className="btn light" onClick={loadDistrictData}>Refresh data</button></div></header><div className="notice">{notice}</div>
  {section==="Overview"&&<><div className="welcome"><div><div className="eyebrow pale">DISTRICT ELECTION DASHBOARD</div><h2>{activeDistrict?.name||"Select district"}</h2><p>Live summaries calculated from the district's polling-station and census-block records.</p><p className="hint">Staffing assignments, reserves and training attendance will be activated after verified staff/trainer/venue imports.</p></div><button className="btn white" onClick={()=>setSection("DATA Import")}>Manage primary DATA →</button></div>
  <div className="dash-section-title"><h2>Election overview</h2><span>Live PostgreSQL figures</span></div>
@@ -152,7 +241,7 @@ export default function App(){
  <div className="dash-grid">
  <div className="panel dash-wide"><div className="panel-head"><div><h3>NC / VC-wise polling station register summary</h3><p>Council type, council number and full council name are kept as separate fields</p></div></div><div className="table-wrap"><table><thead><tr><th>Tehsil</th><th>NC/VC Type</th><th>NC/VC No</th><th>NC/VC Name</th><th>Stations</th><th>Blocks</th><th>Male voters</th><th>Female voters</th><th>Total voters</th><th>Male booths</th><th>Female booths</th></tr></thead><tbody>{councilSummary.map((c,i)=><tr key={c.tehsil+"|"+c.type+"|"+c.number+"|"+i}><td>{c.tehsil}</td><td><b>{c.type}</b></td><td>{c.number}</td><td>{c.name}</td><td>{c.stations}</td><td>{c.blocks}</td><td>{c.maleVoters.toLocaleString()}</td><td>{c.femaleVoters.toLocaleString()}</td><td><b>{(c.maleVoters+c.femaleVoters).toLocaleString()}</b></td><td>{c.maleBooths}</td><td>{c.femaleBooths}</td></tr>)}</tbody></table>{!councilSummary.length&&<Empty/>}</div></div>
  <div className="panel"><h3>5% reserve and total training requirement</h3><p>Reserve is rounded up separately for each staffing category</p><div className="table-wrap"><table><thead><tr><th>Category</th><th>Duty</th><th>5% reserve</th><th>Training required</th></tr></thead><tbody>{reserveSummary.categories.map(x=><tr key={x.label}><td>{x.label}</td><td>{x.duty.toLocaleString()}</td><td>{x.reserve.toLocaleString()}</td><td><b>{x.training.toLocaleString()}</b></td></tr>)}</tbody><tfoot><tr><th>Total</th><th>{reserveSummary.totalDuty.toLocaleString()}</th><th>{reserveSummary.totalReserve.toLocaleString()}</th><th>{reserveSummary.totalTraining.toLocaleString()}</th></tr></tfoot></table></div><div className="dash-note">This is a demand-side target. It does not imply that staff have been imported, assigned or trained.</div></div>
- <div className="panel"><h3>Staffing and training data status</h3><p>Operational counts are shown only when verified source records exist</p><div className="dash-stat"><span>Staff roster</span><b>Not imported</b></div><div className="dash-stat"><span>Duty assignments / vacancies</span><b>Not yet calculated</b></div><div className="dash-stat"><span>Master trainers / venues</span><b>Not imported</b></div><div className="dash-stat"><span>Training batches / attendance</span><b>Not imported</b></div><div className="dash-note">The normalized staff, trainer, venue and attendance tables are currently empty. No artificial zero-vacancy or attendance figures are displayed.</div></div>
+ <div className="panel"><h3>Staffing and training data status</h3><p>Operational counts are shown only when verified source records exist</p><div className="dash-stat"><span>Staff roster</span><b>{opsCounts.staff.toLocaleString()}</b></div><div className="dash-stat"><span>Duty assignments / vacancies</span><b>Not yet calculated</b></div><div className="dash-stat"><span>Master trainers / venues</span><b>{opsCounts.trainers} / {opsCounts.venues}</b></div><div className="dash-stat"><span>Training batches / attendance</span><b>Not imported</b></div><div className="dash-note">Actual imported counts are shown above. Duty assignments, generated training batches and attendance remain separate until their operational workflows are run.</div></div>
  <div className="panel"><h3>Data quality checks</h3><p>Missing values are counted from the imported source records</p><div className="dash-stat"><span>Missing Tehsil</span><b>{dataQuality.missingTehsil.toLocaleString()}</b></div><div className="dash-stat"><span>Missing NC/VC type</span><b>{dataQuality.missingCouncilType.toLocaleString()}</b></div><div className="dash-stat"><span>Missing NC/VC number</span><b>{dataQuality.missingCouncilNo.toLocaleString()}</b></div><div className="dash-stat"><span>Missing NC/VC name</span><b>{dataQuality.missingCouncilName.toLocaleString()}</b></div><div className="dash-stat"><span>Missing census block code</span><b>{dataQuality.missingBlockCode.toLocaleString()}</b></div><div className="dash-stat"><span>Missing station name / type</span><b>{(dataQuality.missingStationName+dataQuality.missingStationType).toLocaleString()}</b></div><div className="dash-stat"><span>Missing voter values (source rows)</span><b>{dataQuality.missingVoterValues.toLocaleString()}</b></div></div>
  <div className="panel"><h3>Polling station classification</h3><p>Male, female and combined station counts</p><div className="dash-stat"><span>Male only</span><b>{stationTypeCounts.male}</b></div><div className="dash-stat"><span>Female only</span><b>{stationTypeCounts.female}</b></div><div className="dash-stat"><span>Combined</span><b>{stationTypeCounts.combined}</b></div><div className="dash-stat total"><span>Total classified</span><b>{stationTypeCounts.male+stationTypeCounts.female+stationTypeCounts.combined}</b></div></div>
  </div>
@@ -172,6 +261,7 @@ export default function App(){
  </div>
  <div className="panel"><h3>Database relationship check</h3><p>{counts.stations===counts.allocations&&counts.blocks===counts.allocations?"The current record counts match. Verify station/block relationships for duplicate or missing links.":"Record counts differ: census blocks, allocations and polling stations require reconciliation."}</p><div className="cards"><Metric label="TEHSILS" value={counts.tehsils}/><Metric label="POLLING STATIONS" value={counts.stations}/><Metric label="CENSUS BLOCKS" value={counts.blocks}/><Metric label="BLOCK–STATION LINKS" value={counts.allocations}/></div></div></>}
  {section==="DATA Import"&&<div className="panel import-panel"><div className="upload-icon">⇧</div><h2>Upload primary polling station DATA</h2><p>Upload the district DATA Excel/CSV file. It is sent to Supabase in batches of up to 20 rows; slow batches are automatically split and linked to Tehsils, Councils, Polling Stations, Census Blocks and allocations.</p><input ref={input} hidden type="file" accept=".xlsx,.xls,.csv" onChange={e=>importData(e.target.files?.[0])}/><div className="header-actions"><button className="btn light" onClick={downloadTemplate}>Download Excel Template</button><button className="btn primary" disabled={busy||!districtId} onClick={()=>input.current?.click()}>{busy?"Uploading…":"Choose DATA Excel / CSV"}</button></div><div className="hint">Required: Tehsil, Council Type, Council No, Council Name, PS No, station name/type, booths, Census Block Code and voter columns. Original row fields are retained.</div>{issues.length>0&&<div className="issue-box"><b>Rows requiring review ({issues.length}{issues.length===300?"+":""})</b>{issues.slice(0,30).map((x,i)=><div key={i}>{x}</div>)}</div>}</div>}
+ {section==="Staff & Training Import"&&<div className="panel import-panel"><div className="upload-icon">⇧</div><h2>Restore Kohat staff and training records</h2><p>Select the original saved Kohat HTML backup. The importer reads its embedded DEFAULT_DATA and restores staff, master trainers, venue/classroom records, demand rules and training settings into the selected district's Supabase tables. It does not overwrite existing polling DATA or delete existing records.</p><div className="cards dash-kpis"><Metric label="STAFF IN DATABASE" value={opsCounts.staff}/><Metric label="MASTER TRAINERS" value={opsCounts.trainers}/><Metric label="VENUE / CLASSROOM RECORDS" value={opsCounts.venues}/><Metric label="DEMAND RULES" value={opsCounts.rules}/><Metric label="TRAINING PLANS" value={opsCounts.plans}/></div><input ref={legacyInput} hidden type="file" accept=".html,.htm,text/html" onChange={e=>importLegacyBackup(e.target.files?.[0])}/><div className="header-actions"><button className="btn primary" disabled={busy||!districtId||activeDistrict?.name!=="Kohat"} onClick={()=>legacyInput.current?.click()}>{busy?"Importing records…":"Choose original Kohat HTML backup"}</button><button className="btn light" disabled={busy} onClick={loadDistrictData}>Refresh counts</button></div><div className="hint">The saved source backup contains 6,644 staff, 12 master trainers and 11 venue/classroom records. Records are inserted in small batches. If a timeout occurs, select the same file again; matching CNICs, rules, settings and training plans are skipped.</div></div>}
  {section==="Polling Stations"&&<div className="panel"><div className="panel-head"><div><h3>Polling station register</h3><p>Live records loaded from Supabase.</p></div><span className="tag">{stations.length} shown</span></div><div className="table-wrap"><table><thead><tr><th>#</th><th>Tehsil No</th><th>Tehsil</th><th>Tehsil PS No</th><th>NC/VC Type</th><th>NC/VC No</th><th>NC/VC Name</th><th>NC/VC PS No</th><th>Polling Station</th><th>Type</th><th>Male booths</th><th>Female booths</th><th>Male voters</th><th>Female voters</th></tr></thead><tbody>{sortedStations.map((s,i)=><tr key={s.id}><td>{i+1}</td><td>{tehsilOrder.indexOf(String(s.source_data?.Tehsil??"").trim())+1}</td><td>{String(s.source_data?.Tehsil??"—")}</td><td>{String(s.tehsil_ps_number??s.source_data?.["Tehsil PS No"]??"—")}</td><td><b>{String(s.source_data?.["Council Type (NC / VC)"]??"—")}</b></td><td>{String(s.source_data?.["NC/VC No"]??s.source_data?.["Council No"]??"—")}</td><td>{String(s.source_data?.["Council Name"]??"—")}</td><td>{String(s.nc_vc_ps_number||s.source_data?.["NC/VC PS No"]||s.ps_number||"—")}</td><td>{s.name}</td><td>{s.station_type}</td><td>{s.male_booths??0}</td><td>{s.female_booths??0}</td><td>{Number(s.male_voters||0).toLocaleString()}</td><td>{Number(s.female_voters||0).toLocaleString()}</td></tr>)}</tbody></table>{!stations.length&&<Empty/>}</div></div>}
  {section==="Staff Demand"&&<div className="panel"><h3>Demand calculation</h3><p>Demand is calculated from the DATA import independently of staff availability. Upload or reload DATA to calculate the station-level demand preview.</p><Metric label="REQUIRED STAFF FROM CURRENT UPLOAD" value={showDemand}/></div>}
  {section==="Relations Check"&&<div className="panel"><h3>Database relationship checks</h3><div className="cards"><Metric label="TEHSILS" value={counts.tehsils}/><Metric label="STATIONS" value={counts.stations}/><Metric label="CENSUS BLOCKS" value={counts.blocks}/><Metric label="ALLOCATIONS" value={counts.allocations}/></div><p>{counts.stations&&counts.allocations&&counts.blocks===counts.allocations?"Relationship counts match: each imported census block has a station allocation.":"Relationship counts need review. Expected one allocation per census block; check missing or duplicate block-to-station links before relying on reports."}</p><button className="btn light" onClick={loadDistrictData}>Recheck PostgreSQL counts</button></div>}
