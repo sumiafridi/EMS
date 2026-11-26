@@ -10,7 +10,8 @@ const chunkSize=20;
 
 export default function App(){
  const [session,setSession]=useState<any>(null),[email,setEmail]=useState(""),[districts,setDistricts]=useState<District[]>([]),[districtId,setDistrictId]=useState(""),[section,setSection]=useState("Overview");
- const [rows,setRows]=useState<DataRow[]>([]),[stations,setStations]=useState<StationRow[]>([]),[counts,setCounts]=useState({tehsils:0,stations:0,blocks:0,allocations:0}),[opsCounts,setOpsCounts]=useState({staff:0,trainers:0,venues:0,rules:0,plans:0,settings:0});
+ const [rows,setRows]=useState<DataRow[]>([]),[stations,setStations]=useState<StationRow[]>([]),[counts,setCounts]=useState({tehsils:0,stations:0,blocks:0,allocations:0}),[opsCounts,setOpsCounts]=useState({staff:0,trainers:0,venues:0,rules:0,plans:0,settings:0,assignments:0,reserves:0,batches:0,participants:0,attendance:0});
+ const [staffRecords,setStaffRecords]=useState<any[]>([]),[trainerRecords,setTrainerRecords]=useState<any[]>([]),[venueRecords,setVenueRecords]=useState<any[]>([]),[assignmentRecords,setAssignmentRecords]=useState<any[]>([]),[reserveRecords,setReserveRecords]=useState<any[]>([]),[batchRecords,setBatchRecords]=useState<any[]>([]),[participantRecords,setParticipantRecords]=useState<any[]>([]),[attendanceRecords,setAttendanceRecords]=useState<any[]>([]);
  const [notice,setNotice]=useState("Connecting to Supabase…"),[busy,setBusy]=useState(false),[issues,setIssues]=useState<string[]>([]);
  const input=useRef<HTMLInputElement>(null),legacyInput=useRef<HTMLInputElement>(null),uploadInput=useRef<HTMLInputElement>(null);
  const [uploadRows,setUploadRows]=useState<Record<string,any[]>>({});
@@ -54,24 +55,30 @@ export default function App(){
  async function loadDistricts(){const {data,error}=await supabase.from("districts").select("id,name,code").eq("is_active",true).order("name");if(error){setNotice("District access error: "+error.message);return;}setDistricts(data||[]);if(!districtId&&data?.length)setDistrictId(data.find(d=>d.name==="Kohat")?.id||data[0].id);}
  async function loadDistrictData(){
   setNotice("Loading district records from Supabase…");
-  const [t,c,s,b,a,staffCount,trainerCount,venueCount,ruleCount,planCount,settingsCount]=await Promise.all([
+  const [t,c,s,b,a,staffCount,trainerCount,venueCount,ruleCount,planCount,settingsCount,assignmentCount,reserveCount,batchCount,participantCount,attendanceCount]=await Promise.all([
    supabase.from("election_tehsils").select("id",{count:"exact",head:true}).eq("district_id",districtId),
    supabase.from("election_councils").select("id",{count:"exact",head:true}).eq("district_id",districtId),
    supabase.from("polling_stations").select("id,tehsil_id,ps_number,nc_vc_ps_number,tehsil_ps_number,name,station_type,male_booths,female_booths,male_voters,female_voters,source_data",{count:"exact"}).eq("district_id",districtId).limit(2000),
    supabase.from("census_blocks").select("id,source_data",{count:"exact"}).eq("district_id",districtId).limit(5000),
    supabase.from("block_station_allocations").select("id",{count:"exact",head:true}).eq("district_id",districtId),
-   supabase.from("election_staff").select("id",{count:"exact",head:true}).eq("district_id",districtId),
-   supabase.from("master_trainers").select("id",{count:"exact",head:true}).eq("district_id",districtId),
-   supabase.from("training_venues").select("id",{count:"exact",head:true}).eq("district_id",districtId),
-   supabase.from("demand_rules").select("id",{count:"exact",head:true}).eq("district_id",districtId),
-   supabase.from("training_plans").select("id",{count:"exact",head:true}).eq("district_id",districtId),
-   supabase.from("district_settings").select("id",{count:"exact",head:true}).eq("district_id",districtId)
+   supabase.from("election_staff").select("*",{count:"exact"}).eq("district_id",districtId).limit(10000),
+   supabase.from("master_trainers").select("*",{count:"exact"}).eq("district_id",districtId).limit(1000),
+   supabase.from("training_venues").select("*",{count:"exact"}).eq("district_id",districtId).limit(1000),
+   supabase.from("demand_rules").select("*",{count:"exact"}).eq("district_id",districtId).limit(1000),
+   supabase.from("training_plans").select("*",{count:"exact"}).eq("district_id",districtId).limit(100),
+   supabase.from("district_settings").select("*",{count:"exact"}).eq("district_id",districtId).limit(1000),
+   supabase.from("staff_assignments").select("*",{count:"exact"}).eq("district_id",districtId).limit(10000),
+   supabase.from("reserve_staff").select("*",{count:"exact"}).eq("district_id",districtId).limit(10000),
+   supabase.from("training_batches").select("*",{count:"exact"}).eq("district_id",districtId).limit(5000),
+   supabase.from("training_participants").select("*",{count:"exact"}).eq("district_id",districtId).limit(10000),
+   supabase.from("training_attendance").select("*",{count:"exact"}).eq("district_id",districtId).limit(10000)
   ]);
-  const err=[t.error,c.error,s.error,b.error,a.error,staffCount.error,trainerCount.error,venueCount.error,ruleCount.error,planCount.error,settingsCount.error].find(Boolean);if(err){setNotice("Could not load district data: "+err.message);return;}
+  const err=[t.error,c.error,s.error,b.error,a.error,staffCount.error,trainerCount.error,venueCount.error,ruleCount.error,planCount.error,settingsCount.error,assignmentCount.error,reserveCount.error,batchCount.error,participantCount.error,attendanceCount.error].find(Boolean);if(err){setNotice("Could not load district data: "+err.message);return;}
   setStations((s.data||[]) as StationRow[]);
   setRows((b.data||[]).map(x=>x.source_data as DataRow).filter(Boolean));
   setCounts({tehsils:t.count||0,stations:s.count||0,blocks:b.count||0,allocations:a.count||0});
-  setOpsCounts({staff:staffCount.count||0,trainers:trainerCount.count||0,venues:venueCount.count||0,rules:ruleCount.count||0,plans:planCount.count||0,settings:settingsCount.count||0});
+  setStaffRecords(staffCount.data||[]);setTrainerRecords(trainerCount.data||[]);setVenueRecords(venueCount.data||[]);setAssignmentRecords(assignmentCount.data||[]);setReserveRecords(reserveCount.data||[]);setBatchRecords(batchCount.data||[]);setParticipantRecords(participantCount.data||[]);setAttendanceRecords(attendanceCount.data||[]);
+  setOpsCounts({staff:staffCount.count||0,trainers:trainerCount.count||0,venues:venueCount.count||0,rules:ruleCount.count||0,plans:planCount.count||0,settings:settingsCount.count||0,assignments:assignmentCount.count||0,reserves:reserveCount.count||0,batches:batchCount.count||0,participants:participantCount.count||0,attendance:attendanceCount.count||0});
   setNotice("Connected to Supabase · "+(activeDistrict?.name||"District")+" data loaded from PostgreSQL.");
  }
  function downloadTemplate(){const headers=["District","Tehsil No","Tehsil","Tehsil PS No","NC/VC No","Council Type (NC / VC)","Council Name","NC/VC PS No","PS No","No & Name of Polling Station","PS Type (Male / Female / Combined)","Booths Male","Booths Female","Male Voters (block)","Female Voters (block)","Census Block Code","Electoral Area name"];const ws=XLSX.utils.aoa_to_sheet([headers]);ws["!cols"]=headers.map(h=>({wch:Math.max(16,h.length+2)}));const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,ws,"DATA Template");XLSX.writeFile(book,"KPK_Election_DATA_Template.xlsx");}
