@@ -73,3 +73,5 @@
 .record-form-grid input:focus,.record-form-grid select:focus{outline:2px solid #b8d9ef;border-color:#4b93c1}
 .modal-card>.header-actions{display:flex;justify-content:flex-end;gap:9px;padding-top:12px;border-top:1px solid #e6edf2}
 @media(max-width:650px){.modal-backdrop{padding:8px}.modal-card{max-height:calc(100vh - 16px);padding:15px}.record-form-grid{grid-template-columns:1fr}}
+
+.row-invalid td{background:#fff1ef!important;color:#8d3028!important}.upload-warning{padding:10px 12px;border:1px solid #f1c7c1;border-radius:8px;background:#fff5f3;color:#8d3028;font-size:12px;margin:10px 0}
