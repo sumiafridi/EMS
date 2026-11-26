@@ -108,7 +108,7 @@ export default function App(){
    const missing=cfg.required.filter(h=>!(aliases[h]||[h]).some(a=>headers.includes(a)));
    const warnings:string[]=[];
    if(missing.length)warnings.push("Expected headings not found: "+missing.join(", ")+". The importer will still preserve the rows and map available columns.");
-   parsed.forEach((r:any,i:number)=>{cfg.required.forEach(h=>{const aliases:Record<string,string[]>={"Master Trainer Name":["Master Trainer Name","Name","name"],"Venue Name":["Venue Name","venue_name","Name"],"Classroom Name/No.":["Classroom Name/No.","Classroom","classroom"],"Setting Key":["Setting Key","Key","setting_key"]};if(!String(pick(r,...(aliases[h]||[h])).trim())warnings.push("Row "+(headerIndex+i+2)+": "+h+" is blank.");});});
+   parsed.forEach((r:any,i:number)=>{cfg.required.forEach(h=>{const aliases:Record<string,string[]>={"Master Trainer Name":["Master Trainer Name","Name","name"],"Venue Name":["Venue Name","venue_name","Name"],"Classroom Name/No.":["Classroom Name/No.","Classroom","classroom"],"Setting Key":["Setting Key","Key","setting_key"]};if(!String(pick(r,...(aliases[h]||[h]))??"").trim()warnings.push("Row "+(headerIndex+i+2)+": "+h+" is blank.");});});
    if(kind==="Staff Data"){
     const db=await supabase.from("election_tehsils").select("name").eq("district_id",districtId);
     const known=new Set((db.data||[]).map(x=>norm(x.name)));
