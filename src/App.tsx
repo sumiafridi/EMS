@@ -644,7 +644,7 @@ export default function App(){
    }
    const reserveTargets=reserveSummary.categories;
    const reserveGenerated:any[]=[];
-   const reserveCandidate=(role:string,gender:string)=>{const pools=role==="Presiding Officer"||role==="Senior APO"?[seniorPool]:[juniorPool,seniorPool];for(const pool of pools){const found=pool.find((r:any)=>!used.has(r.id)&&r.gender===gender);if(found)return found;}return null;};
+   const reserveCandidate=(role:string,gender:string)=>{const pools=role==="Presiding Officer"?[presPool]:role==="Senior APO"?[seniorApoPool]:role==="APO"?(allowSeniorSurplus?[apoPool,seniorPool]:[apoPool]):(allowSeniorSurplus?[poPool,seniorPool]:[poPool]);for(const pool of pools){const found=pool.find((r:any)=>!used.has(r.id)&&r.gender===gender);if(found)return found;}return null;};
    for(const target of reserveTargets){for(let n=0;n<target.reserve;n++){const staff=reserveCandidate(target.role,target.gender);if(!staff)break;used.add(staff.id);reserveGenerated.push({district_id:districtId,staff_id:staff.id,reserve_role:target.role,reserve_status:"Draft",reserve_data:{gender:staff.gender,bps_text:staff.rawBps,home_tehsil:staff.tehsil,source:"automatic "+reserveSummary.reservePercent+"% reserve allocation"}});}}
    const reserveIds:string[]=[];
    for(let i=0;i<reserveGenerated.length;i+=250){const {data,error}=await supabase.from("reserve_staff").insert(reserveGenerated.slice(i,i+250)).select("id");if(error)throw new Error("Duty assignments were saved, but reserve rows could not be saved: "+error.message);reserveIds.push(...(data||[]).map((x:any)=>x.id));}
