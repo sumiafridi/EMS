@@ -54,6 +54,17 @@ export default function App(){
  useEffect(()=>{if(session&&districtId)loadDistrictData();},[session,districtId]);
  useEffect(()=>{if(session&&districtId&&uploadConfig[section]){(async()=>{const q=await (supabase as any).from(uploadConfig[section].table).select("*",{count:"exact"}).eq("district_id",districtId).limit(500);if(!q.error)setUploadRecords(q.data||[]);})();}},[session,districtId,section]);
  async function loadDistricts(){const {data,error}=await supabase.from("districts").select("id,name,code").eq("is_active",true).order("name");if(error){setNotice("District access error: "+error.message);return;}setDistricts(data||[]);if(!districtId&&data?.length)setDistrictId(data.find(d=>d.name==="Kohat")?.id||data[0].id);}
+ async function fetchAllDistrictRows(table:string,columns:string,district:string){
+  const data:any[]=[];let count:number|null=null;let offset=0;
+  while(true){
+   const q=await (supabase as any).from(table).select(columns,{count:"exact"}).eq("district_id",district).range(offset,offset+999);
+   if(q.error)return {data,count,error:q.error};
+   data.push(...(q.data||[]));count=q.count??count;
+   if((q.data||[]).length<1000)break;
+   offset+=1000;
+  }
+  return {data,count:count??data.length,error:null};
+ }
  async function loadDistrictData(){
   setNotice("Loading district records from Supabase…");
   const [t,c,s,b,a,staffCount,trainerCount,venueCount,ruleCount,planCount,settingsCount,assignmentCount,reserveCount,batchCount,participantCount,attendanceCount]=await Promise.all([
@@ -62,17 +73,17 @@ export default function App(){
    supabase.from("polling_stations").select("id,tehsil_id,ps_number,nc_vc_ps_number,tehsil_ps_number,name,station_type,male_booths,female_booths,male_voters,female_voters,source_data",{count:"exact"}).eq("district_id",districtId).limit(2000),
    supabase.from("census_blocks").select("id,source_data",{count:"exact"}).eq("district_id",districtId).limit(5000),
    supabase.from("block_station_allocations").select("id,block_id",{count:"exact"}).eq("district_id",districtId).limit(5000),
-   supabase.from("election_staff").select("id,tehsil_id,name,gender,cnic,mobile,department,designation,bps_text,availability,source_data",{count:"exact"}).eq("district_id",districtId).limit(10000),
-   supabase.from("master_trainers").select("id,name,gender,cnic,mobile,source_data",{count:"exact"}).eq("district_id",districtId).limit(1000),
-   supabase.from("training_venues").select("id,name,address,capacity,source_data",{count:"exact"}).eq("district_id",districtId).limit(1000),
-   supabase.from("demand_rules").select("id,role,station_type,gender,basis,per_unit,adjustment,is_active,rule_data",{count:"exact"}).eq("district_id",districtId).limit(1000),
-   supabase.from("training_plans").select("id,plan_type,name,start_date,end_date,duration_days,batch_capacity,plan_data",{count:"exact"}).eq("district_id",districtId).limit(100),
-   supabase.from("district_settings").select("id,setting_key,setting_value",{count:"exact"}).eq("district_id",districtId).limit(1000),
-   supabase.from("staff_assignments").select("id,staff_id,station_id,role,assignment_status,assignment_data",{count:"exact"}).eq("district_id",districtId).limit(10000),
-   supabase.from("reserve_staff").select("id,staff_id,reserve_role,reserve_status,reserve_data",{count:"exact"}).eq("district_id",districtId).limit(10000),
-   supabase.from("training_batches").select("id,plan_id,batch_number,training_date,start_time,end_time,gender_group,role_group,venue_id,room_id,capacity,batch_data",{count:"exact"}).eq("district_id",districtId).limit(5000),
-   supabase.from("training_participants").select("id,plan_id,batch_id,staff_id,status,participant_data",{count:"exact"}).eq("district_id",districtId).limit(10000),
-   supabase.from("training_attendance").select("id,participant_id,attendance_date,status,remarks",{count:"exact"}).eq("district_id",districtId).limit(10000)
+   fetchAllDistrictRows("election_staff","id,tehsil_id,name,gender,cnic,mobile,department,designation,bps_text,availability,source_data",districtId),
+   fetchAllDistrictRows("master_trainers","id,name,gender,cnic,mobile,source_data",districtId),
+   fetchAllDistrictRows("training_venues","id,name,address,capacity,source_data",districtId),
+   fetchAllDistrictRows("demand_rules","id,role,station_type,gender,basis,per_unit,adjustment,is_active,rule_data",districtId),
+   fetchAllDistrictRows("training_plans","id,plan_type,name,start_date,end_date,duration_days,batch_capacity,plan_data",districtId),
+   fetchAllDistrictRows("district_settings","id,setting_key,setting_value",districtId),
+   fetchAllDistrictRows("staff_assignments","id,staff_id,station_id,role,assignment_status,assignment_data",districtId),
+   fetchAllDistrictRows("reserve_staff","id,staff_id,reserve_role,reserve_status,reserve_data",districtId),
+   fetchAllDistrictRows("training_batches","id,plan_id,batch_number,training_date,start_time,end_time,gender_group,role_group,venue_id,room_id,capacity,batch_data",districtId),
+   fetchAllDistrictRows("training_participants","id,plan_id,batch_id,staff_id,status,participant_data",districtId),
+   fetchAllDistrictRows("training_attendance","id,participant_id,attendance_date,status,remarks",districtId)
   ]);
   const err=[t.error,c.error,s.error,b.error,a.error,staffCount.error,trainerCount.error,venueCount.error,ruleCount.error,planCount.error,settingsCount.error,assignmentCount.error,reserveCount.error,batchCount.error,participantCount.error,attendanceCount.error].find(Boolean);if(err){setNotice("Could not load district data: "+err.message);return;}
   setStations((s.data||[]) as StationRow[]);
@@ -140,7 +151,7 @@ export default function App(){
   const cfg=uploadConfig[kind],raw=uploadRows[kind]||[];if(!cfg||!raw.length||!districtId)return;
   setBusy(true);setNotice("Importing "+raw.length.toLocaleString()+" "+kind+" rows into "+activeDistrict?.name+"…");
   try{
-   const existingResult=await (supabase as any).from(cfg.table).select("*").eq("district_id",districtId).limit(10000);
+   const existingResult=await fetchAllDistrictRows(cfg.table,"*",districtId);
    if(existingResult.error)throw existingResult.error;
    const existing=existingResult.data||[];
    const existingMap=new Map<string,any>(existing.map((r:any):[string,any]=>[identity(kind,kind==="District Settings"?{"Setting Key":r.setting_key}:kind==="Training Settings"?{"Training Setting Key":r.setting_key}:kind==="Demand Rules"?(r.rule_data&&Object.keys(r.rule_data).length?r.rule_data:r):r.source_data||r),r]));
