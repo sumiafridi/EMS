@@ -698,9 +698,10 @@ export default function App(){
    let batchNumber=0;
    for(const gender of ["Male","Female"]){
     const g=gender.toLowerCase();
+    const requiredSeats=trainingProjection.groups.find(x=>x.group===roleGroup&&x.gender===gender)?.seats||0;
+    if(!requiredSeats)continue;
     const venues=venueRows.filter(v=>String(v.gender_group||v.source_data?.gender||"").toLowerCase()===g).sort((a,b)=>String(a.classroom||a.source_data?.classroom||a.address||"").localeCompare(String(b.classroom||b.source_data?.classroom||b.address||"")));
     if(!venues.length)throw new Error("No "+gender+" classroom is available for "+roleGroup+". Add or update its venue records.");
-    const requiredSeats=trainingProjection.groups.find(x=>x.group===roleGroup&&x.gender===gender)?.seats||0;
     const venueCapacity=Math.min(...venues.map(v=>Number(v.capacity)||cap));
     const effectiveCap=Math.max(1,Math.min(cap,venueCapacity));
     const neededBatches=Math.ceil(requiredSeats/effectiveCap);
