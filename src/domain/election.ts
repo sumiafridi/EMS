@@ -7,7 +7,9 @@ export interface DataRow {
   "Council Type (NC / VC)"?: unknown;
   "Council No"?: unknown;
   "Council Name"?: unknown;
-  "PS No"?: unknown;\n  "NC/VC PS No"?: unknown;\n  "Tehsil PS No"?: unknown;
+  "PS No"?: unknown;
+  "NC/VC PS No"?: unknown;
+  "Tehsil PS No"?: unknown;
   "No & Name of Polling Station"?: unknown;
   "PS Type (Male / Female / Combined)"?: unknown;
   "Booths Male"?: unknown;
@@ -26,6 +28,8 @@ export interface Station {
   councilNo: string;
   councilName: string;
   psNo: string;
+  sourceTehsilPsNo: string;
+  sourceNcVcPsNo: string;
   stationName: string;
   psType: PollingStationType;
   boothsMale: number;
@@ -74,7 +78,7 @@ export function buildStations(dataRows: DataRow[]): Station[] {
     if (!map.has(key)) {
       map.set(key, {
         district: str(row.District), tehsil, councilType, councilNo,
-        councilName: str(row["Council Name"]), psNo,
+        councilName: str(row["Council Name"]), psNo, sourceTehsilPsNo: str(row["Tehsil PS No"]), sourceNcVcPsNo: str(row["NC/VC PS No"]),
         stationName: str(row["No & Name of Polling Station"]),
         psType: str(row["PS Type (Male / Female / Combined)"]),
         boothsMale: 0, boothsFemale: 0, maleVoters: 0, femaleVoters: 0,
@@ -97,8 +101,8 @@ export function buildStations(dataRows: DataRow[]): Station[] {
   return stations.map((station, index) => {
     const tKey = station.tehsil.trim().toLowerCase();
     const cKey = `${tKey}|${station.councilType.trim().toUpperCase()}|${station.councilNo.trim().toLowerCase()}`;
-    const tehsilStationNo = (tehsilCounters.get(tKey) ?? 0) + 1;
-    const ncVcStationNo = (councilCounters.get(cKey) ?? 0) + 1;
+    const tehsilStationNo = num(station.sourceTehsilPsNo) || (tehsilCounters.get(tKey) ?? 0) + 1;
+    const ncVcStationNo = num(station.sourceNcVcPsNo) || num(station.psNo) || (councilCounters.get(cKey) ?? 0) + 1;
     tehsilCounters.set(tKey, tehsilStationNo);
     councilCounters.set(cKey, ncVcStationNo);
     return {
