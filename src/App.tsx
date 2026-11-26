@@ -36,7 +36,7 @@ export default function App(){
   setCounts({tehsils:t.count||0,stations:s.count||0,blocks:b.count||0,allocations:a.count||0});
   setNotice("Connected to Supabase · "+(activeDistrict?.name||"District")+" data loaded from PostgreSQL.");
  }
- async function sendLogin(){if(!email.trim()){setNotice("Enter your account email first.");return;}setBusy(true);const {error}=await supabase.auth.signInWithOtp({email:email.trim(),options:{emailRedirectTo:window.location.origin+"/EMS/"}});setNotice(error?"Sign-in error: "+error.message:"A secure sign-in link has been sent to "+email+". Open it on this device.");setBusy(false);}
+ async function sendLogin(){if(!email.trim()){setNotice("Enter your account email first.");return;}setBusy(true);const {error}=await supabase.auth.signInWithOtp({email:email.trim(),options:{emailRedirectTo:new URL(import.meta.env.BASE_URL,window.location.origin).toString()}});setNotice(error?"Sign-in error: "+error.message:"A secure sign-in link has been sent to "+email+". Open it on this device.");setBusy(false);}
  async function importData(file?:File){
   if(!file||!districtId)return;setBusy(true);setIssues([]);setNotice("Reading "+file.name+"…");
   try{
