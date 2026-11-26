@@ -430,7 +430,7 @@ export default function App(){
    const seen=new Set<string>(),prepared:any[]=[];
    const jsonValue=(v:any)=>{if(v===undefined||v===null||v==="")return null;if(typeof v==="string"){try{return JSON.parse(v);}catch{return v;}}return v;};
    raw.forEach((r:any,index:number)=>{
-    const rowNo=Number(r.__excel_row)||index+2,key=identity(kind,r);let reason="";const sourceRow=Object.fromEntries(Object.entries(r).filter(([k])=>k!=="__excel_row"));
+    const rowNo=Number(r.__excel_row)||index+2,key=identity(kind,r);let reason="";const sourceRow=Object.fromEntries(Object.entries(r).filter(([k]:[string,any])=>k!=="__excel_row"));
     if(cfg.required.some(h=>!String(pick(r,...(kind==="Master Trainers"&&h==="Master Trainer Name"?["Master Trainer Name","Name","name"]:kind==="Training Venues"&&h==="Venue Name"?["Venue Name","venue_name","Name"]:kind==="Demand Rules"&&h==="Duty Role"?["Duty Role","Role"]:kind==="District Settings"?["Setting Key","Key","setting_key"]:kind==="Training Settings"?["Training Setting Key","Setting Key","Key","setting_key"]:kind==="Training Plans"?["Plan Type","plan_type"]:[h]))??"").trim()))reason="Missing required field(s).";
     if(key&&seen.has(key))reason="Duplicate identity in this upload file; held for manual review.";
     if(key)seen.add(key);
@@ -490,7 +490,7 @@ export default function App(){
  }
 
  async function uploadBatchWithSplit(part:DataRow[],startRow:number):Promise<number>{
-  const cleanPart=part.map((r:any)=>Object.fromEntries(Object.entries(r).filter(([k])=>k!=="__excel_row")));const {data,error}=await supabase.rpc("import_district_data_rows",{p_district_id:districtId,p_rows:cleanPart});
+  const cleanPart=part.map((r:any)=>Object.fromEntries(Object.entries(r).filter(([k]:[string,any])=>k!=="__excel_row")));const {data,error}=await supabase.rpc("import_district_data_rows",{p_district_id:districtId,p_rows:cleanPart});
   if(!error){const result:any=data||{};if(Array.isArray(result.row_errors)&&result.row_errors.length)setIssues(prev=>[...prev,...result.row_errors.map((x:any)=>"DATA Excel row "+(Number(part[Number(x.batch_row||1)-1]?.__excel_row)||startRow+Number(x.batch_row||1)+1)+": "+x.reason)]);return Number(result.rows_processed??part.length);}
   const message=error.message||"Database import failed";
   const timedOut=/statement timeout|timeout|canceling statement/i.test(message);
