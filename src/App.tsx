@@ -78,8 +78,8 @@ export default function App(){
   const [t,c,s,b,a,staffCount,trainerCount,venueCount,ruleCount,planCount,settingsCount,assignmentCount,reserveCount,batchCount,participantCount,attendanceCount]=await Promise.all([
    supabase.from("election_tehsils").select("id",{count:"exact",head:true}).eq("district_id",districtId),
    supabase.from("election_councils").select("id",{count:"exact",head:true}).eq("district_id",districtId),
-   supabase.from("polling_stations").select("id,source_key,tehsil_id,ps_number,nc_vc_ps_number,tehsil_ps_number,name,station_type,male_booths,female_booths,male_voters,female_voters,source_data",{count:"exact"}).eq("district_id",districtId).limit(2000),
-   supabase.from("census_blocks").select("id,block_code,male_voters,female_voters,source_data",{count:"exact"}).eq("district_id",districtId).limit(5000),
+   fetchAllDistrictRows("polling_stations","id,source_key,tehsil_id,ps_number,nc_vc_ps_number,tehsil_ps_number,name,station_type,male_booths,female_booths,male_voters,female_voters,source_data",districtId),
+   fetchAllDistrictRows("census_blocks","id,block_code,male_voters,female_voters,source_data",districtId),
    fetchAllDistrictRows("block_station_allocations","id,block_id,station_id,gender_group,allocation_data",districtId),
    fetchAllDistrictRows("election_staff","id,tehsil_id,source_staff_id,name,gender,cnic,mobile,department,designation,bps_text,availability,place_of_posting,qualification,date_of_retirement,remarks,source_data",districtId),
    fetchAllDistrictRows("master_trainers","id,name,gender,cnic,mobile,designation,department,bps_text,trainer_id,assigned_training_category,availability_status,remarks,is_placeholder,source_data",districtId),
@@ -364,7 +364,7 @@ export default function App(){
    if(!selected||selected.score<Math.min(2,cfg.required.length))throw new Error("Could not identify a reliable "+kind+" heading row. Download the matching template and keep its column names.");
    const normalized=selected.rawHeaders.map(headerKey),mapping:Record<string,number>={},ambiguousHeaders:string[]=[];
    for(const canonical of cfg.headers){const exact=normalized.map((k:string,i:number)=>k===headerKey(canonical)?i:-1).filter((i:number)=>i>=0),accepted=[canonical,...requiredAliases(canonical)].map(headerKey),matches=normalized.map((k:string,i:number)=>accepted.includes(k)?i:-1).filter((i:number)=>i>=0);if(exact.length===1)mapping[canonical]=exact[0];else if(exact.length>1){mapping[canonical]=-1;ambiguousHeaders.push(canonical);}else if(matches.length===1)mapping[canonical]=matches[0];else{mapping[canonical]=-1;if(matches.length>1)ambiguousHeaders.push(canonical);}}
-   if(ambiguousHeaders.some(h=>cfg.required.includes(h)))throw new Error("Ambiguous duplicate columns for required fields: "+ambiguousHeaders.filter(h=>cfg.required.includes(h)).join(", ")+". Keep one clearly named column for each required field.");
+   if(ambiguousHeaders.length)throw new Error("Ambiguous columns detected for: "+ambiguousHeaders.join(", ")+". Keep one unambiguous column for each field before importing.");
    const missing=cfg.required.filter(h=>mapping[h]===undefined||mapping[h]<0);
    const parsed=selected.matrix.slice(selected.headerIndex+1).map((r:any[],dataIndex:number)=>({r,dataIndex})).filter(({r}:any)=>r.some((v:any)=>String(v??"").trim()!=="")).map(({r,dataIndex}:any)=>{
     const rawRow:any={};selected.rawHeaders.forEach((h:string,j:number)=>{if(h)rawRow[h]=r[j]??"";});
@@ -490,8 +490,8 @@ export default function App(){
  }
 
  async function uploadBatchWithSplit(part:DataRow[],startRow:number):Promise<number>{
-  const {data,error}=await supabase.rpc("import_district_data_rows",{p_district_id:districtId,p_rows:part});
-  if(!error){const result:any=data||{};if(Array.isArray(result.row_errors)&&result.row_errors.length)setIssues(prev=>[...prev,...result.row_errors.map((x:any)=>"DATA Excel row "+(startRow+Number(x.batch_row||1)+1)+": "+x.reason)]);return Number(result.rows_processed??part.length);}
+  const cleanPart=part.map((r:any)=>Object.fromEntries(Object.entries(r).filter(([k])=>k!=="__excel_row")));const {data,error}=await supabase.rpc("import_district_data_rows",{p_district_id:districtId,p_rows:cleanPart});
+  if(!error){const result:any=data||{};if(Array.isArray(result.row_errors)&&result.row_errors.length)setIssues(prev=>[...prev,...result.row_errors.map((x:any)=>"DATA Excel row "+(Number(part[Number(x.batch_row||1)-1]?.__excel_row)||startRow+Number(x.batch_row||1)+1)+": "+x.reason)]);return Number(result.rows_processed??part.length);}
   const message=error.message||"Database import failed";
   const timedOut=/statement timeout|timeout|canceling statement/i.test(message);
   if(timedOut&&part.length>1){
@@ -657,7 +657,7 @@ export default function App(){
    if(!selected||bestScore<Math.min(4,required.length))throw new Error("No reliable DATA heading row was found. Download the DATA template and keep the district, Tehsil, council, station and block columns.");
    selectedSheet=selected.sheetName;headerRow=selected.headerIndex+1;const normalized=selected.rawHeaders.map(headerKey),mapping:Record<string,number>={};for(const canonical of Object.keys(dataAliases)){const accepted=[canonical,...dataAliases[canonical]].map(headerKey);mapping[canonical]=normalized.findIndex((k:string)=>accepted.includes(k));}
    const missing=required.filter(x=>mapping[x]===undefined||mapping[x]<0);if(missing.length)throw new Error("The selected worksheet "+selectedSheet+" is missing required headings: "+missing.join(", "));
-   parsed=selected.matrix.slice(selected.headerIndex+1).filter((r:any[])=>r.some(v=>String(v??"").trim()!=="")).map((r:any[])=>{const rawRow:any={};selected.rawHeaders.forEach((h:string,j:number)=>{if(h)rawRow[h]=r[j]??"";});const canonical:any={};for(const key of Object.keys(dataAliases)){const idx=mapping[key];if(idx>=0)canonical[key]=r[idx]??"";}return {...rawRow,...canonical} as DataRow;});
+   parsed=selected.matrix.slice(selected.headerIndex+1).map((r:any[],dataIndex:number)=>({r,dataIndex})).filter(({r}:any)=>r.some((v:any)=>String(v??"").trim()!=="")).map(({r,dataIndex}:any)=>{const rawRow:any={};selected.rawHeaders.forEach((h:string,j:number)=>{if(h)rawRow[h]=r[j]??"";});const canonical:any={};for(const key of Object.keys(dataAliases)){const idx=mapping[key];if(idx>=0)canonical[key]=r[idx]??"";}return {...rawRow,...canonical,__excel_row:selected.headerIndex+dataIndex+2} as DataRow;});
    if(!parsed.length)throw new Error("No DATA rows found in worksheet "+selectedSheet+".");
    const sourceDistricts=[...new Set(parsed.map((r:any)=>String(r.District||"").trim()).filter(Boolean))];if(sourceDistricts.length>1)throw new Error("This DATA workbook contains multiple districts ("+sourceDistricts.join(", ")+"). Upload one district at a time.");if(sourceDistricts.length===1&&norm(sourceDistricts[0])!==norm(activeDistrict?.name))throw new Error("The workbook belongs to "+sourceDistricts[0]+", but the selected district is "+(activeDistrict?.name||"unknown")+". Select the matching district before importing.");
    const errors:string[]=[],valid:DataRow[]=[],seenAllocations=new Set<string>(),stationMeta=new Map<string,string>(),blockSegments=new Map<string,Map<string,string>>(),existingBlockSegments=new Map<string,Set<string>>();
