@@ -21,6 +21,7 @@ export interface DataRow {
 }
 
 export interface Station {
+  id?: string;
   sNo: number;
   district: string;
   tehsil: string;
