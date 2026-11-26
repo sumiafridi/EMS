@@ -659,9 +659,8 @@ export default function App(){
  }
  async function generateTrainingBatches(){
   if(!districtId)return;
-  const active=assignmentRecords.filter(a=>String(a.assignment_status||"").toLowerCase()==="active");
+  const active=operationalSummary.activeAssignments;
   if(!active.length){setNotice("Generate and save duty assignments first. No active assigned staff are available for training.");setSection("Staff Demand");return;}
-  if(batchRecords.length){setNotice("Training batches already exist. Review the existing schedule first; automatic regeneration is disabled to protect attendance history.");return;}
   const plansQ=await supabase.from("training_plans").select("*").eq("district_id",districtId);
   if(plansQ.error){setNotice(plansQ.error.message);return;}
   const plans=plansQ.data||[];
@@ -695,7 +694,7 @@ export default function App(){
    const eveningStart=time("evening_start",planData.evening_start||"14:00"),eveningEnd=time("evening_end",planData.evening_end||"17:00");
    const batchStart:number[]=[];
    const venueRows=venueRecords.filter(v=>{const g=String(v.gender_group||v.source_data?.gender||"").toLowerCase();return (g==="male"||g==="female")&&String(v.availability??v.source_data?.availability??"yes").toLowerCase()!=="no"&&Number(v.capacity)>0&&!!String(v.classroom||v.source_data?.classroom||"").trim();});
-   let batchNumber=0;
+   let batchNumber=Math.max(0,...batchRecords.map((b:any)=>Number(b.batch_number)||0));
    for(const gender of ["Male","Female"]){
     const g=gender.toLowerCase();
     const requiredSeats=trainingProjection.groups.find(x=>x.group===roleGroup&&x.gender===gender)?.seats||0;
@@ -736,9 +735,34 @@ export default function App(){
    const inserted:any[]=[];for(let i=0;i<batchesToSave.length;i+=100){const q=await supabase.from("training_batches").insert(batchesToSave.slice(i,i+100)).select("id,plan_id,batch_number");if(q.error)throw q.error;inserted.push(...(q.data||[]));setNotice("Saved "+inserted.length+" / "+batchesToSave.length+" batches…");}
    const idByBatch=new Map(inserted.map(b=>[b.plan_id+":"+b.batch_number,b.id]));
    const participantRows=participantsToSave.map(p=>({district_id:districtId,plan_id:p.plan_id,batch_id:idByBatch.get(p.plan_id+":"+p.batch_number),staff_id:p.staff_id,status:p.status,participant_data:p.participant_data})).filter(p=>p.batch_id);
-   for(let i=0;i<participantRows.length;i+=250){const q=await supabase.from("training_participants").insert(participantRows.slice(i,i+250));if(q.error)throw q.error;setNotice("Saved "+Math.min(i+250,participantRows.length)+" / "+participantRows.length+" participants…");}
+   const existingParticipants=await supabase.from("training_participants").select("id,plan_id,staff_id,status").eq("district_id",districtId);
+   if(existingParticipants.error)throw existingParticipants.error;
+   const existingByStaff=new Map((existingParticipants.data||[]).map((p:any)=>[p.plan_id+":"+p.staff_id,p]));
+   const scheduledKeys=new Set(participantRows.map(p=>p.plan_id+":"+p.staff_id));
+   for(let i=0;i<participantRows.length;i++){
+    const p=participantRows[i],key=p.plan_id+":"+p.staff_id,existing:any=existingByStaff.get(key);
+    if(existing){
+     const hasAttendance=attendanceRecords.some((a:any)=>a.participant_id===existing.id);
+     const {error}=await supabase.from("training_participants").update({batch_id:p.batch_id,status:hasAttendance?existing.status:"Assigned",participant_data:p.participant_data}).eq("id",existing.id).eq("district_id",districtId);
+     if(error)throw error;
+    }else{
+     const {error}=await supabase.from("training_participants").insert(p);
+     if(error)throw error;
+    }
+    if((i+1)%100===0)setNotice("Linking participants by permanent staff ID: "+(i+1)+" / "+participantRows.length+"…");
+   }
+   const oldParticipants=(existingParticipants.data||[]).filter((p:any)=>!scheduledKeys.has(p.plan_id+":"+p.staff_id));
+   for(const p of oldParticipants){
+    if(attendanceRecords.some((a:any)=>a.participant_id===p.id))continue;
+    const {error}=await supabase.from("training_participants").update({status:"Superseded"}).eq("id",p.id).eq("district_id",districtId);
+    if(error)throw error;
+   }
+   for(const old of batchRecords){
+    const {error}=await supabase.from("training_batches").update({batch_data:{...(old.batch_data||{}),generation_status:"Superseded",superseded_at:new Date().toISOString()}}).eq("id",old.id).eq("district_id",districtId);
+    if(error)throw error;
+   }
    for(const b of inserted){const original=batchesToSave.find(x=>x.plan_id===b.plan_id&&x.batch_number===b.batch_number);const {error}=await supabase.from("training_batches").update({batch_data:{...original.batch_data,generation_status:"Active"}}).eq("id",b.id);if(error)throw error;}
-   await loadDistrictData();setNotice("Training schedule generated: "+inserted.length+" batches, "+participantRows.length+" participants. Any unfilled seats are shown as Missing Staff; attendance history was not overwritten.");
+   await loadDistrictData();setNotice("Training schedule regenerated: "+inserted.length+" new batches. Existing participant IDs were reused by staff ID, attendance rows were preserved, and previous batches were archived.");
   }catch(e){setNotice("Training generation stopped: "+(e instanceof Error?e.message:String(e))+". Any already saved rows remain visible as Draft for review; do not run generation again until those rows are checked.");}
   finally{setBusy(false);}
  }
@@ -1033,7 +1057,17 @@ export default function App(){
   const val=(r:any,...keys:string[])=>{for(const k of keys){const v=r?.[k]??r?.source_data?.[k];if(v!==undefined&&v!==null&&String(v).trim()!=="")return String(v).trim();}return "";};
   const staffById=new Map<string,any>(staffRecords.map((x:any):[string,any]=>[x.id,x]));
   const stationById=new Map<string,any>(stations.map((x:any):[string,any]=>[x.id,x]));
-  const activeAssignments=assignmentRecords.filter(a=>String(a.assignment_status||"Active").toLowerCase()==="active");
+  const cnicCountsForEligibility=new Map<string,number>();staffRecords.forEach(r=>{const c=val(r,"cnic","CNIC #").replace(/\\D/g,"");if(c)cnicCountsForEligibility.set(c,(cnicCountsForEligibility.get(c)||0)+1);});
+  const knownTehsils=new Set(dashboard.tehsils.map((t:any)=>String(t.name||"").trim().toLowerCase()));
+  const isStaffDutyEligible=(st:any)=>{
+   if(!st)return false;
+   const name=val(st,"name","Name of Officer/Official"),gender=val(st,"gender","Gender").toLowerCase(),tehsil=val(st,"Tehsil","tehsil");
+   const rawBps=val(st,"bps_text","BPS"),bps=rawBps!==""?Number(rawBps):NaN;
+   const availability=val(st,"availability","Availability (Y/N)").toLowerCase();
+   const cnic=val(st,"cnic","CNIC #").replace(/\\D/g,"");
+   return !!name&&(gender==="male"||gender==="female")&&!!tehsil&&knownTehsils.has(tehsil.toLowerCase())&&Number.isInteger(bps)&&bps>=7&&["y","yes","available"].includes(availability)&&(!cnic||cnicCountsForEligibility.get(cnic)===1);
+  };
+  const activeAssignments=assignmentRecords.filter(a=>String(a.assignment_status||"Active").toLowerCase()==="active"&&isStaffDutyEligible(staffById.get(a.staff_id)));
   const roleName=(v:string)=>{const x=v.toLowerCase().replace(/\s+/g," ").trim();if(x==="po"||x==="polling officer")return "Polling Officer";if(x==="presiding"||x==="presiding officer"||x==="pro")return "Presiding Officer";if(x==="sr apo"||x==="senior apo")return "Senior APO";if(x==="nq"||x==="naib qasid")return "Naib Qasid";return v;};
   const assignedFor=(tehsil:string,role:string,gender:string)=>activeAssignments.filter(a=>{
    const st=staffById.get(a.staff_id),ps=stationById.get(a.station_id);
@@ -1074,7 +1108,8 @@ export default function App(){
   const batchGroups=[{label:"Presiding / Senior APO",male:batchRecords.filter(b=>String(b.role_group||b.batch_data?.role_group||"").toLowerCase().includes("pres")&&String(b.gender_group||"").toLowerCase()==="male").length,female:batchRecords.filter(b=>String(b.role_group||b.batch_data?.role_group||"").toLowerCase().includes("pres")&&String(b.gender_group||"").toLowerCase()==="female").length},{label:"APO + PO",male:batchRecords.filter(b=>/apo|po/i.test(String(b.role_group||b.batch_data?.role_group||""))&&String(b.gender_group||"").toLowerCase()==="male").length,female:batchRecords.filter(b=>/apo|po/i.test(String(b.role_group||b.batch_data?.role_group||""))&&String(b.gender_group||"").toLowerCase()==="female").length}];
   const roleKey=(v:string)=>{const k=v.toLowerCase().replace(/[^a-z]/g,"");if(k==="pro"||k==="presiding"||k==="presidingofficer")return "Presiding Officer";if(k==="srapo"||k==="seniorapo"||k==="seniorassistantpresidingofficer")return "Senior APO";if(k==="apo"||k==="assistantpresidingofficer")return "APO";if(k==="po"||k==="pollingofficer")return "PO";return v;};
   const reserveRows=reserveSummary.categories.map(c=>{const actual=reserveRecords.filter(r=>{const st=staffById.get(r.staff_id);return String(r.reserve_status||"Available").toLowerCase()==="available"&&roleKey(String(r.reserve_role||""))===c.role&&val(st,"Gender","gender").toLowerCase()===c.gender.toLowerCase();}).length;return {...c,actual,shortage:Math.max(0,c.reserve-actual)};});
-  return {activeAssignments,assignedRows,vacancyRows,staffIssues,invalidCnic,invalidMobile,duplicateCnic,trainerMale,trainerFemale,availableVenues:availableVenues.length,venueMale,venueFemale,venueCapacity,present,absent,pending,sundayBatches,venueConflicts,crossAssignments,reserveByRole,reserveRows,batchGroups};
+  const ineligibleActiveAssignments=assignmentRecords.filter(a=>String(a.assignment_status||"Active").toLowerCase()==="active"&&!isStaffDutyEligible(staffById.get(a.staff_id))).length;
+  return {activeAssignments,ineligibleActiveAssignments,assignedRows,vacancyRows,staffIssues,invalidCnic,invalidMobile,duplicateCnic,trainerMale,trainerFemale,availableVenues:availableVenues.length,venueMale,venueFemale,venueCapacity,present,absent,pending,sundayBatches,venueConflicts,crossAssignments,reserveByRole,reserveRows,batchGroups};
  },[staffRecords,trainerRecords,venueRecords,assignmentRecords,reserveRecords,batchRecords,attendanceRecords,stations,dashboard]);
 
  const reportPageNames=new Set([
