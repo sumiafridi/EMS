@@ -27,7 +27,11 @@ export default function App(){
  const uploadConfig:Record<string,{table:string;title:string;description:string;headers:string[];required:string[]}> = {
   "Staff Data":{table:"election_staff",title:"Staff Data / Employee Roster",description:"Import the complete employee roster. CNIC is used as the main identity; source S.No is retained as a fallback. Original BPS and all source columns are preserved.",headers:["S.No","Tehsil","Name of Officer/Official","Gender","CNIC #","Department","Designation","BPS","Place of Posting","Qualification","Date of Retirement","Mobile #","Availability (Y/N)"],required:["Tehsil","Name of Officer/Official","Gender"]},
   "Master Trainers":{table:"master_trainers",title:"Master Trainers",description:"Upload male and female master trainers. CNIC is used to update an existing trainer instead of creating duplicates.",headers:["Master Trainer Name","Gender","Designation","Department","BPS","CNIC","Mobile Number"],required:["Master Trainer Name","Gender"]},
-  "Training Venues":{table:"training_venues",title:"Training Venues / Classrooms",description:"Each row represents one room/classroom. Venue, classroom, gender, capacity, availability and session dates are retained in source_data.",headers:["Gender","Venue Name","Classroom Name/No.","Maximum Capacity","Availability (Yes/No)","Available Sessions","Available From","Available To"],required:["Gender","Venue Name","Classroom Name/No."]},
+  "Training Venues":{table:"training_venues",title:"Training Venues / Classrooms",description:"Each row represents one room/classroom. Venue, classroom, gender, capacity, availability and session dates are mapped to scheduling fields and preserved in source_data.",headers:["Gender","Venue Name","Classroom Name/No.","Maximum Capacity","Availability (Yes/No)","Available Sessions","Available From","Available To"],required:["Gender","Venue Name","Classroom Name/No."]},
+  "Demand Rules":{table:"demand_rules",title:"Staffing Demand Rules",description:"Import role, station type, gender, basis, posts per unit, adjustment and active status.",headers:["Duty Role","Station Type","Required Gender","Basis","Posts per Unit","Adjustment per Station","Active","Rule Key"],required:["Duty Role","Posts per Unit"]},
+  "Training Plans":{table:"training_plans",title:"Training Programme Definitions",description:"Import programme type, name, dates, duration and batch capacity. These are programme definitions, not generated batches.",headers:["Plan Type","Plan Name","Start Date","End Date","Duration Days","Batch Capacity"],required:["Plan Type"]},
+  "District Settings":{table:"district_settings",title:"District Settings",description:"Import district configuration key/value pairs. Values are parsed as JSON when valid.",headers:["Setting Key","Setting Value"],required:["Setting Key"]},
+  "Training Settings":{table:"district_settings",title:"Training Settings",description:"Import training configuration key/value pairs. Keys are stored with the training: prefix.",headers:["Training Setting Key","Training Setting Value"],required:["Training Setting Key"]},
  };
  const activeDistrict=districts.find(d=>d.id===districtId);
  const calculated=useMemo(()=>calculateDemand(stations.map((s,i):Station=>{const d=s.source_data||{};const tn=Number(s.tehsil_ps_number)||i+1;const cn=Number(s.nc_vc_ps_number||s.ps_number)||i+1;return {id:s.id,sNo:i+1,district:String(d.District??""),tehsil:String(d.Tehsil??""),councilType:String(d["Council Type (NC / VC)"]??""),councilNo:String(d["Council No"]??""),councilName:String(d["Council Name"]??""),psNo:String(s.nc_vc_ps_number||s.ps_number||""),sourceTehsilPsNo:String(d["Tehsil PS No"]??""),sourceNcVcPsNo:String(d["NC/VC PS No"]??""),stationName:s.name,psType:s.station_type||String(d["PS Type (Male / Female / Combined)"]??""),boothsMale:Number(s.male_booths??0),boothsFemale:Number(s.female_booths??0),maleVoters:Number(s.male_voters??0),femaleVoters:Number(s.female_voters??0),blockCount:0,blocks:[],tehsilStationNo:tn,ncVcStationNo:cn,tehsilPollingStationNo:tn,ncVcPollingStationNo:cn};}),(ruleRecords.length?ruleRecords.filter(r=>r.is_active!==false).map(r=>r.rule_data&&Object.keys(r.rule_data).length?r.rule_data:r):undefined)),[stations,ruleRecords]);
@@ -227,8 +231,8 @@ export default function App(){
  function norm(v:any){return String(v??"").trim().toLowerCase();}
  function dateValue(v:any):string|null{if(v===undefined||v===null||String(v).trim()==="")return null;if(v instanceof Date&&!Number.isNaN(v.getTime()))return v.toISOString().slice(0,10);if(typeof v==="number"){const p=XLSX.SSF.parse_date_code(v);if(p)return String(p.y).padStart(4,"0")+"-"+String(p.m).padStart(2,"0")+"-"+String(p.d).padStart(2,"0");}const raw=String(v).trim();if(/^\d{4}-\d{2}-\d{2}/.test(raw))return raw.slice(0,10);const d=new Date(raw);return Number.isNaN(d.getTime())?null:d.toISOString().slice(0,10);}
  function identity(kind:string,row:any){
-  if(kind==="Staff Data")return norm(pick(row,"CNIC #","CNIC"))||("source:"+norm(pick(row,"S.No","S No","Serial No")));
-  if(kind==="Master Trainers")return norm(pick(row,"CNIC","CNIC #"))||[norm(pick(row,"Master Trainer Name","name","Name")),norm(pick(row,"Gender","gender"))].join("|");
+  if(kind==="Staff Data")return norm(pick(row,"S.No","S No","Serial No","source_staff_id"))||[norm(pick(row,"Name of Officer/Official","Name","name")),norm(pick(row,"Gender","gender")),norm(pick(row,"Tehsil","Home Tehsil")),norm(pick(row,"Department","department")),norm(pick(row,"Designation","designation"))].join("|");
+  if(kind==="Master Trainers")return [norm(pick(row,"Master Trainer Name","name","Name")),norm(pick(row,"Gender","gender")),norm(pick(row,"Department","department")),norm(pick(row,"Designation","designation")),norm(pick(row,"Mobile Number","Mobile #","mobile"))].join("|");
   if(kind==="Training Venues")return [norm(pick(row,"Gender","gender")),norm(pick(row,"Venue Name","venue_name")),norm(pick(row,"Classroom Name/No.","Classroom","classroom"))].join("|");
   if(kind==="Demand Rules"){const source=row.rule_data||row;return norm(pick(source,"Rule Key"))||[norm(pick(source,"Duty Role","role")),norm(pick(source,"Station Type","station_type")),norm(pick(source,"Required Gender","gender"))].join("|");}
   if(kind==="Training Plans")return norm(pick(row,"Plan Type","plan_type"));
@@ -239,34 +243,27 @@ export default function App(){
   if(!file||!uploadConfig[kind])return;
   setBusy(true);setUploadWarnings([]);setUploadRecords([]);setUploadFileName(file.name);setNotice("Reading "+file.name+"…");
   try{
-   const wb=XLSX.read(await file.arrayBuffer(),{type:"array"});
-   const cfg=uploadConfig[kind];
-   const aliases:Record<string,string[]>={"Master Trainer Name":["Master Trainer Name","Name","name"],"Venue Name":["Venue Name","venue_name","Name"],"Classroom Name/No.":["Classroom Name/No.","Classroom","classroom"],"Setting Key":["Setting Key","Key","setting_key"],"Training Setting Key":["Training Setting Key","Setting Key","Key","setting_key"]};
+   const wb=XLSX.read(await file.arrayBuffer(),{type:"array",cellDates:true}),cfg=uploadConfig[kind];
+   const aliases:Record<string,string[]>={"Master Trainer Name":["Master Trainer Name","Name","name"],"Venue Name":["Venue Name","venue_name","Name"],"Classroom Name/No.":["Classroom Name/No.","Classroom","classroom"],"Setting Key":["Setting Key","Key","setting_key"],"Training Setting Key":["Training Setting Key","Setting Key","Key","setting_key"],"Training Setting Value":["Training Setting Value","Setting Value","Value","setting_value"],"Required Gender":["Required Gender","Gender","gender"],"Plan Type":["Plan Type","plan_type"],"Plan Name":["Plan Name","Name","name"]};
    let matrix:any[][]=[],headerIndex=0,best=-1,selectedSheet=wb.SheetNames[0]||"";
-   for(const sheetName of wb.SheetNames){
-    const candidate=XLSX.utils.sheet_to_json<any[]>(wb.Sheets[sheetName],{header:1,defval:""});
-    let candidateBest=0,candidateHeader=0;
-    for(let i=0;i<Math.min(candidate.length,20);i++){
-     const vals=(candidate[i]||[]).map((v:any)=>String(v??"").trim().toLowerCase());
-     const score=cfg.required.filter(h=>(aliases[h]||[h]).some(a=>vals.includes(a.toLowerCase()))).length;
-     if(score>candidateBest){candidateBest=score;candidateHeader=i;}
-    }
-    if(candidateBest>best){best=candidateBest;matrix=candidate;headerIndex=candidateHeader;selectedSheet=sheetName;}
-   }
-   const headers=(matrix[headerIndex]||[]).map((v:any)=>String(v??"").trim());
-   if(!headers.some(Boolean))throw new Error("No column headings found in the first 20 rows.");
-   const parsed=matrix.slice(headerIndex+1).filter((r:any[])=>r.some(v=>String(v??"").trim()!=="")).map((r:any[],i:number)=>Object.fromEntries(headers.map((h:string,j:number)=>[h,r[j]??""])));
+   for(const sheetName of wb.SheetNames){const candidate=XLSX.utils.sheet_to_json<any[]>(wb.Sheets[sheetName],{header:1,defval:""});for(let i=0;i<Math.min(candidate.length,25);i++){const vals=(candidate[i]||[]).map((v:any)=>String(v??"").trim().toLowerCase());const score=cfg.required.filter(h=>(aliases[h]||[h]).some(a=>vals.includes(a.toLowerCase()))).length;if(score>best){best=score;matrix=candidate;headerIndex=i;selectedSheet=sheetName;}}}
+   const headers=(matrix[headerIndex]||[]).map((v:any)=>String(v??"").trim());if(!headers.some(Boolean))throw new Error("No column headings found in the first 25 rows.");
+   const parsed=matrix.slice(headerIndex+1).filter((r:any[])=>r.some(v=>String(v??"").trim()!=="")).map((r:any[])=>Object.fromEntries(headers.map((h:string,j:number)=>[h,r[j]??""])));
    if(!parsed.length)throw new Error("No data rows found under the detected headings.");
-   const missing=cfg.required.filter(h=>!(aliases[h]||[h]).some(a=>headers.includes(a)));
-   const warnings:string[]=[];
-   if(missing.length)warnings.push("Expected headings not found: "+missing.join(", ")+". The importer will still preserve the rows and map available columns.");
-   parsed.forEach((r:any,i:number)=>{cfg.required.forEach(h=>{if(!String(pick(r,...(aliases[h]||[h]))??"").trim())warnings.push("Row "+(headerIndex+i+2)+": "+h+" is blank.");});});
-   if(kind==="Staff Data"){
-    const db=await supabase.from("election_tehsils").select("name").eq("district_id",districtId);
-    const known=new Set((db.data||[]).map(x=>norm(x.name)));
-    parsed.forEach((r:any,i:number)=>{if(r.Tehsil&&!known.has(norm(r.Tehsil)))warnings.push("Row "+(headerIndex+i+2)+": Tehsil '"+r.Tehsil+"' does not match a district Tehsil; it will be imported with an unresolved Tehsil link.");});
-   }
-   setUploadRows(prev=>({...prev,[kind]:parsed}));setUploadWarnings(warnings.slice(0,500));setNotice("Preview ready: "+parsed.length.toLocaleString()+" "+kind+" rows detected from worksheet \""+selectedSheet+"\". Review warnings, then import.");
+   const missing=cfg.required.filter(h=>!(aliases[h]||[h]).some(a=>headers.some(x=>x.toLowerCase()===a.toLowerCase())));
+   const warnings:string[]=[];if(missing.length)warnings.push("Missing headings: "+missing.join(", ")+". Rows will be checked individually; valid rows can still be imported.");
+   const seen=new Set<string>();
+   parsed.forEach((r:any,i:number)=>{
+    cfg.required.forEach(h=>{if(!String(pick(r,...(aliases[h]||[h]))??"").trim())warnings.push("Row "+(headerIndex+i+2)+": required field '"+h+"' is blank.");});
+    if(kind==="Staff Data"){const g=norm(pick(r,"Gender"));if(g&&!["male","female"].includes(g))warnings.push("Row "+(headerIndex+i+2)+": Gender must be Male or Female.");const c=String(pick(r,"CNIC #","CNIC")||"").replace(/\D/g,"");if(c&&c.length!==13)warnings.push("Row "+(headerIndex+i+2)+": CNIC must contain 13 digits.");}
+    if(kind==="Master Trainers"){const g=norm(pick(r,"Gender"));if(g&&!["male","female"].includes(g))warnings.push("Row "+(headerIndex+i+2)+": trainer Gender must be Male or Female.");}
+    if(kind==="Training Venues"){const g=norm(pick(r,"Gender"));if(g&&!["male","female","shared"].includes(g))warnings.push("Row "+(headerIndex+i+2)+": room Gender must be Male, Female or Shared.");const cap=pick(r,"Maximum Capacity","Capacity","capacity");if(cap!==""&&(!Number.isFinite(Number(cap))||Number(cap)<1))warnings.push("Row "+(headerIndex+i+2)+": room capacity must be a positive number.");}
+    if(kind==="Demand Rules"){const v=pick(r,"Posts per Unit");if(v!==""&&(!Number.isFinite(Number(v))||Number(v)<0))warnings.push("Row "+(headerIndex+i+2)+": Posts per Unit must be zero or a positive number.");}
+    if(kind==="Training Plans"){const cap=pick(r,"Batch Capacity"),dur=pick(r,"Duration Days");if(cap!==""&&(!Number.isInteger(Number(cap))||Number(cap)<1))warnings.push("Row "+(headerIndex+i+2)+": Batch Capacity must be a positive whole number.");if(dur!==""&&(!Number.isInteger(Number(dur))||Number(dur)<1))warnings.push("Row "+(headerIndex+i+2)+": Duration Days must be a positive whole number.");}
+    const key=identity(kind,r);if(key&&seen.has(key))warnings.push("Row "+(headerIndex+i+2)+": duplicate identity in this workbook; this row will be held for manual review, not merged.");else if(key)seen.add(key);
+   });
+   if(kind==="Staff Data"){const db=await supabase.from("election_tehsils").select("name").eq("district_id",districtId);if(db.error)throw db.error;const known=new Set((db.data||[]).map(x=>norm(x.name)));parsed.forEach((r:any,i:number)=>{if(r.Tehsil&&!known.has(norm(r.Tehsil)))warnings.push("Row "+(headerIndex+i+2)+": Tehsil '"+r.Tehsil+"' is not in this district; its link will remain unresolved.");});}
+   setUploadRows(prev=>({...prev,[kind]:parsed}));setUploadWarnings(warnings.slice(0,1000));setNotice("Preview ready: "+parsed.length.toLocaleString()+" rows from '"+selectedSheet+"'. "+warnings.length+" validation warning(s); invalid rows will be held back while valid rows import.");
   }catch(e){setNotice("Could not prepare upload: "+(e instanceof Error?e.message:String(e)));}
   finally{setBusy(false);if(uploadInput.current)uploadInput.current.value="";}
  }
@@ -277,38 +274,63 @@ export default function App(){
  }
  async function commitUpload(kind=section){
   const cfg=uploadConfig[kind],raw=uploadRows[kind]||[];if(!cfg||!raw.length||!districtId)return;
-  setBusy(true);setNotice("Importing "+raw.length.toLocaleString()+" "+kind+" rows into "+activeDistrict?.name+"…");
+  setBusy(true);setNotice("Validating and importing "+raw.length+" "+kind+" rows…");
+  const rowErrors:string[]=[];
   try{
-   const existingResult=await fetchAllDistrictRows(cfg.table,"*",districtId);
-   if(existingResult.error)throw existingResult.error;
+   const existingResult=await fetchAllDistrictRows(cfg.table,"*",districtId);if(existingResult.error)throw existingResult.error;
    const existing=existingResult.data||[];
-   const existingMap=new Map<string,any>(existing.map((r:any):[string,any]=>[identity(kind,kind==="District Settings"?{"Setting Key":r.setting_key}:kind==="Training Settings"?{"Training Setting Key":r.setting_key}:kind==="Demand Rules"?(r.rule_data&&Object.keys(r.rule_data).length?r.rule_data:r):r.source_data||r),r]));
-   const tehsilResult=kind==="Staff Data"?await supabase.from("election_tehsils").select("id,name").eq("district_id",districtId):{data:[],error:null};
-   if(tehsilResult.error)throw tehsilResult.error;
-   const tehsilMap=new Map<string,string>((tehsilResult.data||[]).map((t:any):[string,string]=>[norm(t.name),t.id]));
-   const invalidRows=raw.filter((r:any)=>kind==="Demand Rules"?!String(pick(r,"Duty Role","Role")).trim():kind==="Training Plans"?!String(pick(r,"Plan Type","plan_type")).trim():kind==="District Settings"?!String(pick(r,"Setting Key","Key","setting_key")).trim():kind==="Training Settings"?!String(pick(r,"Training Setting Key","Setting Key","Key","setting_key")).trim():false);
-   const prepared=raw.map((r:any,index:number)=>{
-    const key=identity(kind,r),old=existingMap.get(key);
-    if(kind==="Staff Data")return { ...(old?.id?{id:old.id}:{}),district_id:districtId,tehsil_id:tehsilMap.get(norm(r.Tehsil))||null,source_staff_id:String(pick(r,"S.No","S No")||"").trim()||null,name:String(pick(r,"Name of Officer/Official","Name")||"").trim()||null,gender:String(pick(r,"Gender")||"").trim()||null,cnic:String(pick(r,"CNIC #","CNIC")||"").trim()||null,mobile:String(pick(r,"Mobile #","Mobile")||"").trim()||null,department:String(pick(r,"Department")||"").trim()||null,designation:String(pick(r,"Designation")||"").trim()||null,bps_text:String(pick(r,"BPS")??"").trim()||null,availability:String(pick(r,"Availability (Y/N)","Availability")||"").trim()||null,source_data:r};
-    if(kind==="Master Trainers")return { ...(old?.id?{id:old.id}:{}),district_id:districtId,name:String(pick(r,"Master Trainer Name","name","Name")||"").trim()||null,gender:String(pick(r,"Gender","gender")||"").trim()||null,cnic:String(pick(r,"CNIC","CNIC #","cnic")||"").trim()||null,mobile:String(pick(r,"Mobile Number","Mobile #","mobile")||"").trim()||null,source_data:r};
-    if(kind==="Training Venues")return { ...(old?.id?{id:old.id}:{}),district_id:districtId,name:String(pick(r,"Venue Name","venue_name","Name")||("Unspecified venue row "+(index+1))).trim(),address:[pick(r,"Classroom Name/No.","Classroom","classroom"),pick(r,"Gender","gender"),pick(r,"Available Sessions","sessions")].filter(Boolean).join(" · "),capacity:String(pick(r,"Maximum Capacity","Capacity","capacity")).trim()!==""&&Number.isFinite(Number(pick(r,"Maximum Capacity","Capacity","capacity")))?Number(pick(r,"Maximum Capacity","Capacity","capacity")):null,source_data:r};
-    if(kind==="Demand Rules"){const ruleKey=String(pick(r,"Rule Key")||[pick(r,"Duty Role"),pick(r,"Station Type"),pick(r,"Required Gender")].join("|"));return { ...(old?.id?{id:old.id}:{}),district_id:districtId,role:String(pick(r,"Duty Role","Role")||"").trim(),station_type:String(pick(r,"Station Type")||"").trim()||null,gender:String(pick(r,"Required Gender","Gender")||"").trim()||null,basis:String(pick(r,"Basis")||"").trim()||null,per_unit:Number(pick(r,"Posts per Unit"))||0,adjustment:pick(r,"Adjustment per Station")===""?null:Number(pick(r,"Adjustment per Station")),is_active:true,rule_data:{...r,"Rule Key":ruleKey}};}
-    if(kind==="Training Plans"){const type=String(pick(r,"Plan Type","plan_type")||"").trim();return { ...(old?.id?{id:old.id}:{}),district_id:districtId,plan_type:type,name:String(pick(r,"Plan Name","Name")||type).trim(),start_date:dateValue(pick(r,"Start Date","start_date")),end_date:dateValue(pick(r,"End Date","end_date")),duration_days:Number(pick(r,"Duration Days"))||null,batch_capacity:Number(pick(r,"Batch Capacity"))||null,plan_data:r};}
-    const settingKey=String(kind==="Training Settings"?pick(r,"Training Setting Key","setting_key"):pick(r,"Setting Key","Key","setting_key")||"").trim();return { ...(old?.id?{id:old.id}:{}),district_id:districtId,setting_key:(kind==="Training Settings"?"training:":"")+settingKey,setting_value:kind==="Training Settings"?pick(r,"Training Setting Value","Value","setting_value"):pick(r,"Setting Value","Value","setting_value")};
-   }).filter((r:any)=>kind!=="Demand Rules"||!!r.role).filter((r:any)=>kind!=="Training Plans"||!!r.plan_type).filter((r:any)=>!["District Settings","Training Settings"].includes(kind)||!!r.setting_key);
+   const tehsilQ=kind==="Staff Data"?await supabase.from("election_tehsils").select("id,name").eq("district_id",districtId):{data:[],error:null};
+   if(tehsilQ.error)throw tehsilQ.error;
+   const tehsilMap=new Map<string,string>((tehsilQ.data||[]).map((x:any):[string,string]=>[norm(x.name),x.id]));
+   const existingByKey=new Map<string,any>(),ambiguous=new Set<string>();
+   for(const old of existing){const src=old.source_data||old.rule_data||old.plan_data||old;const key=identity(kind,kind==="District Settings"?{"Setting Key":old.setting_key}:kind==="Training Settings"?{"Training Setting Key":String(old.setting_key||"").replace(/^training:/,"")}:src);if(!key)continue;if(existingByKey.has(key)){ambiguous.add(key);existingByKey.delete(key);}else if(!ambiguous.has(key))existingByKey.set(key,old);}
+   const seen=new Set<string>(),prepared:any[]=[];
+   const jsonValue=(v:any)=>{if(v===undefined||v===null||v==="")return null;if(typeof v==="string"){try{return JSON.parse(v);}catch{return v;}}return v;};
+   raw.forEach((r:any,index:number)=>{
+    const rowNo=index+1,key=identity(kind,r);let reason="";
+    if(cfg.required.some(h=>!String(pick(r,...(kind==="Master Trainers"&&h==="Master Trainer Name"?["Master Trainer Name","Name","name"]:kind==="Training Venues"&&h==="Venue Name"?["Venue Name","venue_name","Name"]:kind==="Demand Rules"&&h==="Duty Role"?["Duty Role","Role"]:kind==="District Settings"?["Setting Key","Key","setting_key"]:kind==="Training Settings"?["Training Setting Key","Setting Key","Key","setting_key"]:kind==="Training Plans"?["Plan Type","plan_type"]:[h]))??"").trim()))reason="Missing required field(s).";
+    if(key&&seen.has(key))reason="Duplicate identity in this upload file; held for manual review.";
+    if(key)seen.add(key);
+    let payload:any=null;
+    if(kind==="Staff Data"){
+     const gender=String(pick(r,"Gender")||"").trim(),cnic=String(pick(r,"CNIC #","CNIC")||"").replace(/\D/g,""),bps=String(pick(r,"BPS")??"").trim(),tehsil=String(pick(r,"Tehsil")||"").trim();
+     if(!reason&&gender&&!["male","female"].includes(gender.toLowerCase()))reason="Gender must be Male or Female.";
+     if(!reason&&cnic&&cnic.length!==13)reason="CNIC must contain 13 digits.";
+     if(!reason&&tehsil&&!tehsilMap.has(norm(tehsil)))reason="Tehsil does not exist in the selected district.";
+     if(!reason){const src={...r,Tehsil:tehsil,BPS:bps};payload={district_id:districtId,tehsil_id:tehsilMap.get(norm(tehsil))||null,source_staff_id:String(pick(r,"S.No","S No","Serial No")||"").trim()||null,name:String(pick(r,"Name of Officer/Official","Name")||"").trim(),gender:gender||null,cnic:cnic||null,mobile:String(pick(r,"Mobile #","Mobile")||"").trim()||null,department:String(pick(r,"Department")||"").trim()||null,designation:String(pick(r,"Designation")||"").trim()||null,bps_text:bps||null,availability:String(pick(r,"Availability (Y/N)","Availability")||"Y").trim(),source_data:src};}
+    }else if(kind==="Master Trainers"){
+     const gender=String(pick(r,"Gender")||"").trim();if(!reason&&!["male","female"].includes(gender.toLowerCase()))reason="Gender must be Male or Female.";
+     if(!reason){const src={...r,"Master Trainer Name":String(pick(r,"Master Trainer Name","Name","name")||"").trim(),Gender:gender,gender:gender.toLowerCase(),cnic:String(pick(r,"CNIC","CNIC #","cnic")||"").replace(/\D/g,""),mobile:String(pick(r,"Mobile Number","Mobile #","mobile")||"").trim()};payload={district_id:districtId,name:src["Master Trainer Name"],gender,cnic:src.cnic||null,mobile:src.mobile||null,source_data:src};}
+    }else if(kind==="Training Venues"){
+     const gender=String(pick(r,"Gender")||"").trim(),capacity=Number(pick(r,"Maximum Capacity","Capacity","capacity"));if(!reason&&!["male","female","shared"].includes(gender.toLowerCase()))reason="Gender must be Male, Female or Shared.";
+     if(!reason&&(!Number.isInteger(capacity)||capacity<1))reason="Maximum Capacity must be a positive whole number.";
+     if(!reason){const name=String(pick(r,"Venue Name","venue_name","Name")||"").trim(),room=String(pick(r,"Classroom Name/No.","Classroom","classroom")||"").trim(),sessions=String(pick(r,"Available Sessions","sessions")||"Both"),availability=String(pick(r,"Availability (Yes/No)","availability")||"Yes");const src={...r,gender:gender.toLowerCase(),classroom:room,availability:availability.toLowerCase(),sessions,available_from:dateValue(pick(r,"Available From","available_from")),available_to:dateValue(pick(r,"Available To","available_to"))};payload={district_id:districtId,name,address:[room,gender,sessions].filter(Boolean).join(" · "),capacity,source_data:src};}
+    }else if(kind==="Demand Rules"){
+     const role=String(pick(r,"Duty Role","Role")||"").trim(),per=Number(pick(r,"Posts per Unit"));if(!reason&&(!Number.isFinite(per)||per<0))reason="Posts per Unit must be zero or a positive number.";
+     if(!reason){const active=String(pick(r,"Active")??"true").toLowerCase();const rule_data={...r,"Rule Key":String(pick(r,"Rule Key")||[role,pick(r,"Station Type"),pick(r,"Required Gender")].join("|"))};payload={district_id:districtId,role,station_type:String(pick(r,"Station Type")||"").trim()||null,gender:String(pick(r,"Required Gender","Gender")||"").trim()||null,basis:String(pick(r,"Basis")||"").trim()||null,per_unit:per,adjustment:pick(r,"Adjustment per Station")===""?null:Number(pick(r,"Adjustment per Station")),is_active:["false","no","0","inactive"].includes(active)?false:true,rule_data};}
+    }else if(kind==="Training Plans"){
+     const type=String(pick(r,"Plan Type","plan_type")||"").trim(),dur=pick(r,"Duration Days"),cap=pick(r,"Batch Capacity"),start=dateValue(pick(r,"Start Date","start_date")),end=dateValue(pick(r,"End Date","end_date"));
+     if(!reason&&dur!==""&&(!Number.isInteger(Number(dur))||Number(dur)<1))reason="Duration Days must be a positive whole number.";
+     if(!reason&&cap!==""&&(!Number.isInteger(Number(cap))||Number(cap)<1))reason="Batch Capacity must be a positive whole number.";
+     if(!reason&&start&&end&&start>end)reason="End Date cannot be before Start Date.";
+     if(!reason)payload={district_id:districtId,plan_type:type,name:String(pick(r,"Plan Name","Name")||type).trim(),start_date:start,end_date:end,duration_days:dur===""?null:Number(dur),batch_capacity:cap===""?null:Number(cap),plan_data:r};
+    }else if(kind==="District Settings"||kind==="Training Settings"){
+     const settingKey=String(kind==="Training Settings"?pick(r,"Training Setting Key","Setting Key","Key","setting_key"):pick(r,"Setting Key","Key","setting_key")||"").trim();
+     if(!reason)payload={district_id:districtId,setting_key:(kind==="Training Settings"?"training:":"")+settingKey,setting_value:jsonValue(kind==="Training Settings"?pick(r,"Training Setting Value","Setting Value","Value","setting_value"):pick(r,"Setting Value","Value","setting_value"))??""};
+    }
+    if(reason||!payload){rowErrors.push("Excel row "+(index+2)+": "+(reason||"Could not map this row."));return;}
+    if(key&&ambiguous.has(key)){rowErrors.push("Excel row "+(index+2)+": matching database identity is ambiguous; row was not overwritten.");return;}
+    const old=key?existingByKey.get(key):null;
+    if(old?.id)payload.id=old.id;
+    prepared.push(payload);
+   });
+   if(!prepared.length){setUploadWarnings(rowErrors.slice(0,1000));setNotice("No rows passed validation. Correct the listed rows and import again; no database rows were changed.");return;}
    let sent=0;
-   for(let i=0;i<prepared.length;i+=250){
-    const part=prepared.slice(i,i+250);const {error}=await (supabase as any).from(cfg.table).upsert(part,{onConflict:"id"});
-    if(error)throw new Error("Rows "+(i+1)+"–"+(i+part.length)+": "+error.message);
-    sent+=part.length;setNotice("Imported "+sent.toLocaleString()+" / "+prepared.length.toLocaleString()+" "+kind+" records…");
-   }
-   const invalid=raw.length-prepared.length;
-   await loadDistrictData();
-   const refreshed=await (supabase as any).from(cfg.table).select("*").eq("district_id",districtId).limit(500);
-   setUploadRecords(refreshed.data||[]);
-   setNotice(kind+" import completed: "+sent.toLocaleString()+" rows saved; "+invalid+" rows could not be mapped to mandatory database fields and remain visible in the preview. Source rows are retained in source_data.");
-   setUploadRows(prev=>({...prev,[kind]:invalidRows}));setUploadWarnings(invalid?[...uploadWarnings,invalid+" rows were not imported because mandatory database keys are missing. Those source rows remain in the preview so you can correct and re-upload them."]:[]);
-  }catch(e){setNotice(kind+" import failed: "+(e instanceof Error?e.message:String(e))+". Rows committed in earlier batches remain saved; re-upload is safe because matching source identities are updated.");}
+   for(let i=0;i<prepared.length;i+=100){const part=prepared.slice(i,i+100);const {error}=await (supabase as any).from(cfg.table).upsert(part,{onConflict:"id"});if(error)throw new Error("Database rejected rows "+(i+1)+"–"+(i+part.length)+": "+error.message);sent+=part.length;setNotice("Saved "+sent+" / "+prepared.length+" valid "+kind+" rows…");}
+   await loadDistrictData();const refreshed=await fetchAllDistrictRows(cfg.table,"*",districtId);if(refreshed.error)throw refreshed.error;setUploadRecords(refreshed.data||[]);
+   setUploadRows(prev=>({...prev,[kind]:raw.filter((r:any,i:number)=>rowErrors.some(e=>e.startsWith("Excel row "+(i+2)+":")))}));setUploadWarnings(rowErrors.slice(0,1000));
+   setNotice(kind+" import finished: "+sent+" rows inserted/updated; "+rowErrors.length+" rows held for correction. Existing rows not present in this file were left unchanged.");
+  }catch(e){setNotice(kind+" import failed: "+(e instanceof Error?e.message:String(e))+". Any earlier committed batches remain saved; refresh before retrying.");}
   finally{setBusy(false);}
  }
 
