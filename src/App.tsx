@@ -4,7 +4,7 @@ import { supabase } from "./lib/supabase";
 import { calculateDemand, type DataRow, type Station } from "./domain/election";
 
 type District={id:string;name:string;code:string};
-type StationRow={id:string;tehsil_id:string|null;ps_number:string|null;nc_vc_ps_number:string|null;tehsil_ps_number:number|null;name:string;station_type:string|null;male_booths:number|null;female_booths:number|null;male_voters:number|null;female_voters:number|null;source_data:DataRow};
+type StationRow={id:string;source_key?:string|null;tehsil_id:string|null;ps_number:string|null;nc_vc_ps_number:string|null;tehsil_ps_number:number|null;name:string;station_type:string|null;male_booths:number|null;female_booths:number|null;male_voters:number|null;female_voters:number|null;source_data:DataRow};
 const required=["Tehsil","Council Type (NC / VC)","Council No","PS No","PS Type (Male / Female / Combined)","Census Block Code"];
 const chunkSize=20;
 
@@ -76,7 +76,7 @@ export default function App(){
   const [t,c,s,b,a,staffCount,trainerCount,venueCount,ruleCount,planCount,settingsCount,assignmentCount,reserveCount,batchCount,participantCount,attendanceCount]=await Promise.all([
    supabase.from("election_tehsils").select("id",{count:"exact",head:true}).eq("district_id",districtId),
    supabase.from("election_councils").select("id",{count:"exact",head:true}).eq("district_id",districtId),
-   supabase.from("polling_stations").select("id,tehsil_id,ps_number,nc_vc_ps_number,tehsil_ps_number,name,station_type,male_booths,female_booths,male_voters,female_voters,source_data",{count:"exact"}).eq("district_id",districtId).limit(2000),
+   supabase.from("polling_stations").select("id,source_key,tehsil_id,ps_number,nc_vc_ps_number,tehsil_ps_number,name,station_type,male_booths,female_booths,male_voters,female_voters,source_data",{count:"exact"}).eq("district_id",districtId).limit(2000),
    supabase.from("census_blocks").select("id,block_code,male_voters,female_voters,source_data",{count:"exact"}).eq("district_id",districtId).limit(5000),
    fetchAllDistrictRows("block_station_allocations","id,block_id,station_id,gender_group,allocation_data",districtId),
    fetchAllDistrictRows("election_staff","id,tehsil_id,name,gender,cnic,mobile,department,designation,bps_text,availability,source_data",districtId),
@@ -164,7 +164,7 @@ export default function App(){
     const cq=await supabase.from("election_councils").select("id").eq("district_id",districtId).eq("tehsil_id",tq.data.id).eq("council_type",cType).eq("council_number",cNo).maybeSingle();if(cq.error)throw cq.error;if(!cq.data)throw new Error("Council not found. Import/create the council before adding its polling station.");
     const numeric=["Male Booths","Female Booths","Male Voters","Female Voters"].map(k=>Number(val(k)||0));if(numeric.some(x=>!Number.isInteger(x)||x<0))throw new Error("Booth and voter values must be non-negative whole numbers.");
     const source_data={...src,Tehsil:tehsilName,"Council Type (NC / VC)":cType,"Council No":cNo,"Council Name":val("Council Name"),"PS No":psNo,"No & Name of Polling Station":stationName,"PS Type (Male / Female / Combined)":stationType,"Booths Male":numeric[0],"Booths Female":numeric[1],"Male Voters (block)":numeric[2],"Female Voters (block)":numeric[3],"Manually Added/Edited":true};
-    payload={district_id:districtId,tehsil_id:tq.data.id,council_id:cq.data.id,source_key:"manual:"+tq.data.id+":"+cq.data.id+":"+psNo,name:stationName,ps_number:psNo,nc_vc_ps_number:psNo,station_type:stationType,male_booths:numeric[0],female_booths:numeric[1],male_voters:numeric[2],female_voters:numeric[3],source_data};table="polling_stations";
+    payload={district_id:districtId,tehsil_id:tq.data.id,council_id:cq.data.id,source_key:record?.source_key||("manual:"+tq.data.id+":"+cq.data.id+":"+psNo),name:stationName,ps_number:psNo,nc_vc_ps_number:psNo,station_type:stationType,male_booths:numeric[0],female_booths:numeric[1],male_voters:numeric[2],female_voters:numeric[3],source_data};table="polling_stations";
    }else if(kind==="Demand Rules"){
     const per=Number(val("Posts per Unit"));if(!val("Duty Role")||!Number.isFinite(per)||per<0)throw new Error("Duty Role and a non-negative Posts per Unit value are required.");
     const adjustment=val("Adjustment per Station")===""?null:Number(val("Adjustment per Station"));if(adjustment!==null&&!Number.isFinite(adjustment))throw new Error("Adjustment must be numeric.");
@@ -547,21 +547,35 @@ export default function App(){
  async function importData(file?:File){
   if(!file||!districtId)return;setBusy(true);setIssues([]);setNotice("Reading "+file.name+"…");
   try{
-   const wb=XLSX.read(await file.arrayBuffer(),{type:"array"});let parsed:DataRow[]=[],selectedSheet="",bestScore=-1;for(const sheetName of wb.SheetNames){const matrix=XLSX.utils.sheet_to_json<any[]>(wb.Sheets[sheetName],{header:1,defval:""});for(let h=0;h<Math.min(matrix.length,20);h++){const headers=(matrix[h]||[]).map((v:any)=>String(v??"").trim());const score=required.filter(x=>headers.includes(x)).length;if(score>bestScore){bestScore=score;selectedSheet=sheetName;const keys=headers;parsed=matrix.slice(h+1).filter((r:any[])=>r.some(v=>String(v??"").trim()!=="")).map((r:any[],i:number)=>Object.fromEntries(keys.map((k:string,j:number)=>[k,r[j]??""])) as DataRow).map((r:any,i:number)=>({...r,__import_order:h+i+2}));}}}
-   if(!parsed.length)throw new Error("No DATA rows found in any worksheet. Check the DATA headings and try again.");
-   const headers=Object.keys(parsed[0]);const missing=required.filter(x=>!headers.includes(x));if(missing.length)throw new Error("The best matching worksheet ("+selectedSheet+") is missing required columns: "+missing.join(", "));
-   const problems:string[]=[];parsed.forEach((r,i)=>{if(!String(r.Tehsil||"").trim())problems.push("Row "+(i+2)+": Tehsil is blank");if(!String(r["No & Name of Polling Station"]||"").trim())problems.push("Row "+(i+2)+": polling station name is blank");if(!String(r["Census Block Code"]||"").trim())problems.push("Row "+(i+2)+": Census Block Code is blank");});
-   setIssues(problems.slice(0,300));let sent=0;
-   for(let i=0;i<parsed.length;i+=chunkSize){
-    const part=parsed.slice(i,i+chunkSize);setNotice("Uploading DATA rows "+(i+1).toLocaleString()+"–"+Math.min(i+part.length,parsed.length).toLocaleString()+" of "+parsed.length.toLocaleString()+"…");
-    sent+=await uploadBatchWithSplit(part,i);
-   }
-   const numbering=await supabase.rpc("refresh_polling_station_numbers",{p_district_id:districtId});if(numbering.error)throw new Error("DATA imported, but polling-station numbering could not be refreshed: "+numbering.error.message);setRows(parsed);await loadDistrictData();setNotice("DATA import completed: "+sent.toLocaleString()+" source rows sent to Supabase in "+Math.ceil(sent/chunkSize)+" batches. "+problems.length+" row issues flagged for review.");
-   setSection("Overview");
-  }catch(e){setNotice("Import stopped: "+(e instanceof Error?e.message:String(e))+" Data already committed in earlier batches, if any. Re-upload is safe because the database import uses district/source keys.");}
+   const wb=XLSX.read(await file.arrayBuffer(),{type:"array",cellDates:true});let parsed:DataRow[]=[],selectedSheet="",bestScore=-1,headerRow=1;
+   for(const sheetName of wb.SheetNames){const matrix=XLSX.utils.sheet_to_json<any[]>(wb.Sheets[sheetName],{header:1,defval:""});for(let h=0;h<Math.min(matrix.length,25);h++){const headers=(matrix[h]||[]).map((v:any)=>String(v??"").trim());const score=required.filter(x=>headers.includes(x)).length;if(score>bestScore){bestScore=score;selectedSheet=sheetName;headerRow=h+1;parsed=matrix.slice(h+1).filter((r:any[])=>r.some(v=>String(v??"").trim()!=="")).map((r:any[],i:number)=>Object.fromEntries(headers.map((k:string,j:number)=>[k,r[j]??""])) as DataRow);}}}
+   if(!parsed.length)throw new Error("No DATA rows found in any worksheet.");
+   const headers=Object.keys(parsed[0]),missing=required.filter(x=>!headers.includes(x));if(missing.length)throw new Error("The selected worksheet '"+selectedSheet+"' is missing key headings: "+missing.join(", ")+". Download the official DATA template and map these columns.");
+   const errors:string[]=[],valid:DataRow[]=[],seenAllocations=new Set<string>(),stationMeta=new Map<string,string>();
+   const normValue=(v:any)=>String(v??"").trim().toLowerCase();
+   parsed.forEach((r:any,i:number)=>{
+    const rowNo=headerRow+i+1,issuesForRow:string[]=[];
+    const tehsil=String(r.Tehsil||"").trim(),cType=String(r["Council Type (NC / VC)"]||"").trim().toUpperCase(),cNo=String(r["Council No"]||"").trim(),cName=String(r["Council Name"]||"").trim(),psNo=String(r["PS No"]||"").trim(),psName=String(r["No & Name of Polling Station"]||"").trim(),psType=String(r["PS Type (Male / Female / Combined)"]||"").trim();
+    const block=String(r["Census Block Code"]||"").trim();
+    if(!tehsil)issuesForRow.push("Tehsil is blank");if(!["NC","VC"].includes(cType))issuesForRow.push("Council Type must be NC or VC");if(!cNo)issuesForRow.push("Council No is blank");if(!cName)issuesForRow.push("Council Name is blank");if(!psNo)issuesForRow.push("PS No is blank");if(!psName)issuesForRow.push("Polling Station Name is blank");if(!["Male","Female","Combined"].includes(psType))issuesForRow.push("Station Type must be Male, Female or Combined");if(!block)issuesForRow.push("Census Block Code is blank");
+    for(const key of ["Booths Male","Booths Female","Male Voters (block)","Female Voters (block)"]){const raw=String(r[key]??"").replace(/,/g,"").trim();if(raw!==""&&(!/^\d+$/.test(raw)||Number(raw)<0))issuesForRow.push(key+" must be a non-negative whole number");}
+    const stationKey=[normValue(tehsil),cType,normValue(cNo),normValue(psNo)].join("|"),stationDesc=[psName,psType].join("|");
+    if(stationKey&&stationMeta.has(stationKey)&&stationMeta.get(stationKey)!==stationDesc)issuesForRow.push("The same station number has conflicting name/type values in this workbook");
+    else if(stationKey)stationMeta.set(stationKey,stationDesc);
+    const allocationKey=stationKey+"|"+normValue(block);
+    if(allocationKey&&seenAllocations.has(allocationKey))issuesForRow.push("Duplicate block-to-station row in this workbook");
+    if(allocationKey)seenAllocations.add(allocationKey);
+    if(issuesForRow.length)errors.push("Excel row "+rowNo+": "+issuesForRow.join("; "));
+    else valid.push(r);
+   });
+   setIssues(errors.slice(0,1000));
+   if(!valid.length){setRows([]);setNotice("No DATA rows passed validation. "+errors.length+" row(s) need correction; no database records were changed.");return;}
+   let sent=0;for(let i=0;i<valid.length;i+=chunkSize){const part=valid.slice(i,i+chunkSize);setNotice("Uploading valid DATA rows "+(i+1)+"–"+Math.min(i+part.length,valid.length)+" of "+valid.length+"…");sent+=await uploadBatchWithSplit(part,i);}
+   const numbering=await supabase.rpc("refresh_polling_station_numbers",{p_district_id:districtId});if(numbering.error)throw new Error("DATA rows imported, but polling-station numbering refresh failed: "+numbering.error.message);
+   setRows(valid);await loadDistrictData();setNotice("DATA import completed: "+sent+" valid rows saved; "+errors.length+" rows held for correction. Original columns are retained in source_data. Existing omitted records were not deleted.");setSection("Overview");
+  }catch(e){setNotice("Import stopped: "+(e instanceof Error?e.message:String(e))+". Rows already committed in earlier batches remain saved; refresh before retrying.");}
   finally{setBusy(false);if(input.current)input.current.value="";}
  }
-
 
  async function importLegacyBackup(file?:File){
   if(!file||!districtId)return;
