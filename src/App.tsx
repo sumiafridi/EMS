@@ -137,10 +137,10 @@ export default function App(){
    const existingResult=await (supabase as any).from(cfg.table).select("*").eq("district_id",districtId).limit(10000);
    if(existingResult.error)throw existingResult.error;
    const existing=existingResult.data||[];
-   const existingMap=new Map(existing.map((r:any)=>[identity(kind,kind==="District Settings"?{"Setting Key":r.setting_key}:kind==="Demand Rules"?(r.rule_data||r):r.source_data||r,r]));
+   const existingMap=new Map<string,any>(existing.map((r:any):[string,any]=>[identity(kind,kind==="District Settings"?{"Setting Key":r.setting_key}:kind==="Demand Rules"?(r.rule_data||r):r.source_data||r),r]));
    const tehsilResult=kind==="Staff Data"?await supabase.from("election_tehsils").select("id,name").eq("district_id",districtId):{data:[],error:null};
    if(tehsilResult.error)throw tehsilResult.error;
-   const tehsilMap=new Map((tehsilResult.data||[]).map((t:any)=>[norm(t.name),t.id]));
+   const tehsilMap=new Map<string,string>((tehsilResult.data||[]).map((t:any):[string,string]=>[norm(t.name),t.id]));
    const prepared=raw.map((r:any,index:number)=>{
     const key=identity(kind,r),old=existingMap.get(key);
     if(kind==="Staff Data")return { ...(old?.id?{id:old.id}:{}),district_id:districtId,tehsil_id:tehsilMap.get(norm(r.Tehsil))||null,source_staff_id:String(pick(r,"S.No","S No")||"").trim()||null,name:String(pick(r,"Name of Officer/Official","Name")||"").trim()||null,gender:String(pick(r,"Gender")||"").trim()||null,cnic:String(pick(r,"CNIC #","CNIC")||"").trim()||null,mobile:String(pick(r,"Mobile #","Mobile")||"").trim()||null,department:String(pick(r,"Department")||"").trim()||null,designation:String(pick(r,"Designation")||"").trim()||null,bps_text:String(pick(r,"BPS")??"").trim()||null,availability:String(pick(r,"Availability (Y/N)","Availability")||"").trim()||null,source_data:r};
@@ -334,8 +334,8 @@ export default function App(){
  const stationTypeCounts={male:stations.filter(s=>String(s.station_type||s.source_data?.["PS Type (Male / Female / Combined)"]||"").toLowerCase()==="male").length,female:stations.filter(s=>String(s.station_type||s.source_data?.["PS Type (Male / Female / Combined)"]||"").toLowerCase()==="female").length,combined:stations.filter(s=>String(s.station_type||s.source_data?.["PS Type (Male / Female / Combined)"]||"").toLowerCase()==="combined").length};
  const operationalSummary=useMemo(()=>{
   const val=(r:any,...keys:string[])=>{for(const k of keys){const v=r?.[k]??r?.source_data?.[k];if(v!==undefined&&v!==null&&String(v).trim()!=="")return String(v).trim();}return "";};
-  const staffById=new Map(staffRecords.map(x=>[x.id,x]));
-  const stationById=new Map(stations.map(x=>[x.id,x]));
+  const staffById=new Map<string,any>(staffRecords.map((x:any):[string,any]=>[x.id,x]));
+  const stationById=new Map<string,any>(stations.map((x:any):[string,any]=>[x.id,x]));
   const activeAssignments=assignmentRecords.filter(a=>String(a.assignment_status||"Active").toLowerCase()==="active");
   const roleName=(v:string)=>{const x=v.toLowerCase().replace(/\s+/g," ").trim();if(x==="po"||x==="polling officer")return "Polling Officer";if(x==="presiding"||x==="presiding officer"||x==="pro")return "Presiding Officer";if(x==="sr apo"||x==="senior apo")return "Senior APO";if(x==="nq"||x==="naib qasid")return "Naib Qasid";return v;};
   const assignedFor=(tehsil:string,role:string,gender:string)=>activeAssignments.filter(a=>{
