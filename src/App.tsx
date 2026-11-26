@@ -363,7 +363,7 @@ export default function App(){
    }
    if(!selected||selected.score<Math.min(2,cfg.required.length))throw new Error("Could not identify a reliable "+kind+" heading row. Download the matching template and keep its column names.");
    const normalized=selected.rawHeaders.map(headerKey),mapping:Record<string,number>={};
-   for(const canonical of cfg.headers){const accepted=[canonical,...requiredAliases(canonical)].map(headerKey);mapping[canonical]=normalized.findIndex(k=>accepted.includes(k));}
+   for(const canonical of cfg.headers){const accepted=[canonical,...requiredAliases(canonical)].map(headerKey);mapping[canonical]=normalized.findIndex((k:string)=>accepted.includes(k));}
    const missing=cfg.required.filter(h=>mapping[h]===undefined||mapping[h]<0);
    const parsed=selected.matrix.slice(selected.headerIndex+1).filter((r:any[])=>r.some(v=>String(v??"").trim()!=="")).map((r:any[])=>{
     const rawRow:any={};selected.rawHeaders.forEach((h:string,j:number)=>{if(h)rawRow[h]=r[j]??"";});
