@@ -1065,14 +1065,14 @@ export default function App(){
   const val=(r:any,...keys:string[])=>{for(const k of keys){const v=r?.[k]??r?.source_data?.[k];if(v!==undefined&&v!==null&&String(v).trim()!=="")return String(v).trim();}return "";};
   const staffById=new Map<string,any>(staffRecords.map((x:any):[string,any]=>[x.id,x]));
   const stationById=new Map<string,any>(stations.map((x:any):[string,any]=>[x.id,x]));
-  const cnicCountsForEligibility=new Map<string,number>();staffRecords.forEach(r=>{const c=val(r,"cnic","CNIC #").replace(/\\D/g,"");if(c)cnicCountsForEligibility.set(c,(cnicCountsForEligibility.get(c)||0)+1);});
+  const cnicCountsForEligibility=new Map<string,number>();staffRecords.forEach(r=>{const c=val(r,"cnic","CNIC #").replace(/\D/g,"");if(c)cnicCountsForEligibility.set(c,(cnicCountsForEligibility.get(c)||0)+1);});
   const knownTehsils=new Set(dashboard.tehsils.map((t:any)=>String(t.name||"").trim().toLowerCase()));
   const isStaffDutyEligible=(st:any)=>{
    if(!st)return false;
    const name=val(st,"name","Name of Officer/Official"),gender=val(st,"gender","Gender").toLowerCase(),tehsil=val(st,"Tehsil","tehsil")||String(dashboard.tehsils.find((t:any)=>t.id===st.tehsil_id)?.name||"");
    const rawBps=val(st,"bps_text","BPS"),bps=rawBps!==""?Number(rawBps):NaN;
    const availability=val(st,"availability","Availability (Y/N)").toLowerCase();
-   const cnic=val(st,"cnic","CNIC #").replace(/\\D/g,"");
+   const cnic=val(st,"cnic","CNIC #").replace(/\D/g,"");
    return !!name&&(gender==="male"||gender==="female")&&!!tehsil&&knownTehsils.has(tehsil.toLowerCase())&&Number.isInteger(bps)&&bps>=7&&["y","yes","available"].includes(availability)&&(!cnic||cnicCountsForEligibility.get(cnic)===1);
   };
   const activeAssignments=assignmentRecords.filter(a=>String(a.assignment_status||"Active").toLowerCase()==="active"&&isStaffDutyEligible(staffById.get(a.staff_id)));
