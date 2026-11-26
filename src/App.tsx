@@ -5,7 +5,7 @@ import { calculateDemand, type DataRow, type Station } from "./domain/election";
 
 type District={id:string;name:string;code:string};
 type StationRow={id:string;source_key?:string|null;tehsil_id:string|null;ps_number:string|null;nc_vc_ps_number:string|null;tehsil_ps_number:number|null;name:string;station_type:string|null;male_booths:number|null;female_booths:number|null;male_voters:number|null;female_voters:number|null;source_data:DataRow};
-const required=["District","Tehsil","Council Type (NC / VC)","Council No","Council Name","PS No","No & Name of Polling Station","PS Type (Male / Female / Combined)","Census Block Code"];
+const required=["District","Tehsil","Council Type (NC / VC)","Council No","Council Name","PS No","No & Name of Polling Station","PS Type (Male / Female / Combined)","Census Block Code","Booths Male","Booths Female","Male Voters (block)","Female Voters (block)"];
 const chunkSize=20;
 
 export default function App(){
@@ -669,7 +669,7 @@ export default function App(){
     const districtName=String(r.District||"").trim(),tehsil=String(r.Tehsil||"").trim(),cType=String(r["Council Type (NC / VC)"]||"").trim().toUpperCase(),cNo=String(r["Council No"]||"").trim(),cName=String(r["Council Name"]||"").trim(),psNo=String(r["PS No"]||"").trim(),psName=String(r["No & Name of Polling Station"]||"").trim(),psTypeRaw=String(r["PS Type (Male / Female / Combined)"]||"").trim(),psType=psTypeRaw.toLowerCase()==="male"?"Male":psTypeRaw.toLowerCase()==="female"?"Female":psTypeRaw.toLowerCase()==="combined"?"Combined":psTypeRaw;
     const block=String(r["Census Block Code"]||"").trim();
     if(!districtName)issuesForRow.push("District is blank");if(districtName&&normValue(districtName)!==normValue(activeDistrict?.name))issuesForRow.push("District value does not match the selected district "+(activeDistrict?.name||""));if(!tehsil)issuesForRow.push("Tehsil is blank");if(!["NC","VC"].includes(cType))issuesForRow.push("Council Type must be NC or VC");if(!cNo)issuesForRow.push("Council No is blank");if(!cName)issuesForRow.push("Council Name is blank");if(!psNo)issuesForRow.push("PS No is blank");if(!psName)issuesForRow.push("Polling Station Name is blank");if(!["Male","Female","Combined"].includes(psType))issuesForRow.push("Station Type must be Male, Female or Combined");if(!block)issuesForRow.push("Census Block Code is blank");
-    for(const key of ["Booths Male","Booths Female","Male Voters (block)","Female Voters (block)"]){const raw=String(r[key]??"").replace(/,/g,"").trim();if(raw!==""&&(!/^\d+$/.test(raw)||Number(raw)<0))issuesForRow.push(key+" must be a non-negative whole number");}
+    for(const key of ["Booths Male","Booths Female","Male Voters (block)","Female Voters (block)"]){const raw=String(r[key]??"").replace(/,/g,"").trim();if(raw==="")issuesForRow.push(key+" is blank; enter 0 when not applicable.");else if(!/^\d+$/.test(raw)||Number(raw)<0)issuesForRow.push(key+" must be a non-negative whole number");}
     const stationKey=[normValue(tehsil),cType,normValue(cNo),normValue(psNo)].join("|"),stationDesc=[psName,psType].join("|");
     if(stationKey&&stationMeta.has(stationKey)&&stationMeta.get(stationKey)!==stationDesc)issuesForRow.push("The same station number has conflicting name/type values in this workbook");
     else if(stationKey)stationMeta.set(stationKey,stationDesc);
