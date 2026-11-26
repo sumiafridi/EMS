@@ -399,7 +399,7 @@ export default function App(){
 
  async function uploadBatchWithSplit(part:DataRow[],startRow:number):Promise<number>{
   const {data,error}=await supabase.rpc("import_district_data_rows",{p_district_id:districtId,p_rows:part});
-  if(!error)return part.length;
+  if(!error){const result:any=data||{};if(Array.isArray(result.row_errors)&&result.row_errors.length)setIssues(prev=>[...prev,...result.row_errors.map((x:any)=>"DATA batch row "+x.batch_row+": "+x.reason)]);return Number(result.rows_processed??part.length);}
   const message=error.message||"Database import failed";
   const timedOut=/statement timeout|timeout|canceling statement/i.test(message);
   if(timedOut&&part.length>1){
@@ -566,7 +566,7 @@ export default function App(){
    const normValue=(v:any)=>String(v??"").trim().toLowerCase();
    parsed.forEach((r:any,i:number)=>{
     const rowNo=headerRow+i+1,issuesForRow:string[]=[];
-    const tehsil=String(r.Tehsil||"").trim(),cType=String(r["Council Type (NC / VC)"]||"").trim().toUpperCase(),cNo=String(r["Council No"]||"").trim(),cName=String(r["Council Name"]||"").trim(),psNo=String(r["PS No"]||"").trim(),psName=String(r["No & Name of Polling Station"]||"").trim(),psType=String(r["PS Type (Male / Female / Combined)"]||"").trim();
+    const tehsil=String(r.Tehsil||"").trim(),cType=String(r["Council Type (NC / VC)"]||"").trim().toUpperCase(),cNo=String(r["Council No"]||"").trim(),cName=String(r["Council Name"]||"").trim(),psNo=String(r["PS No"]||"").trim(),psName=String(r["No & Name of Polling Station"]||"").trim(),psTypeRaw=String(r["PS Type (Male / Female / Combined)"]||"").trim(),psType=psTypeRaw.toLowerCase()==="male"?"Male":psTypeRaw.toLowerCase()==="female"?"Female":psTypeRaw.toLowerCase()==="combined"?"Combined":psTypeRaw;
     const block=String(r["Census Block Code"]||"").trim();
     if(!tehsil)issuesForRow.push("Tehsil is blank");if(!["NC","VC"].includes(cType))issuesForRow.push("Council Type must be NC or VC");if(!cNo)issuesForRow.push("Council No is blank");if(!cName)issuesForRow.push("Council Name is blank");if(!psNo)issuesForRow.push("PS No is blank");if(!psName)issuesForRow.push("Polling Station Name is blank");if(!["Male","Female","Combined"].includes(psType))issuesForRow.push("Station Type must be Male, Female or Combined");if(!block)issuesForRow.push("Census Block Code is blank");
     for(const key of ["Booths Male","Booths Female","Male Voters (block)","Female Voters (block)"]){const raw=String(r[key]??"").replace(/,/g,"").trim();if(raw!==""&&(!/^\d+$/.test(raw)||Number(raw)<0))issuesForRow.push(key+" must be a non-negative whole number");}
