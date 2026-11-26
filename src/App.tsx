@@ -72,7 +72,7 @@ export default function App(){
    supabase.from("election_councils").select("id",{count:"exact",head:true}).eq("district_id",districtId),
    supabase.from("polling_stations").select("id,tehsil_id,ps_number,nc_vc_ps_number,tehsil_ps_number,name,station_type,male_booths,female_booths,male_voters,female_voters,source_data",{count:"exact"}).eq("district_id",districtId).limit(2000),
    supabase.from("census_blocks").select("id,source_data",{count:"exact"}).eq("district_id",districtId).limit(5000),
-   supabase.from("block_station_allocations").select("id,block_id",{count:"exact"}).eq("district_id",districtId).limit(5000),
+   fetchAllDistrictRows("block_station_allocations","id,block_id",districtId),
    fetchAllDistrictRows("election_staff","id,tehsil_id,name,gender,cnic,mobile,department,designation,bps_text,availability,source_data",districtId),
    fetchAllDistrictRows("master_trainers","id,name,gender,cnic,mobile,source_data",districtId),
    fetchAllDistrictRows("training_venues","id,name,address,capacity,source_data",districtId),
