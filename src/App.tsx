@@ -104,7 +104,7 @@ export default function App(){
  }
  async function deletePollingStation(st:any){
   if(!confirm("Delete polling station '"+st.name+"'? A station with block allocations or duty assignments cannot be deleted."))return;
-  setBusy(true);try{const [a,d]=await Promise.all([supabase.from("block_station_allocations").select("id",{count:"exact",head:true}).eq("district_id",districtId).eq("station_id",st.id),supabase.from("staff_assignments").select("id",{count:"exact",head:true}).eq("district_id",districtId).eq("station_id",st.id)]);if(a.error||d.error)throw a.error||d.error;if((a.count||0)+(d.count||0)>0)throw new Error("This station still has block allocations or duty assignments. Move its blocks and resolve assignments first.");const {error}=await supabase.from("polling_stations").delete().eq("id",st.id).eq("district_id",districtId);if(error)throw error;await loadDistrictData();setNotice("Polling station deleted.");}catch(e){setNotice("Station deletion blocked: "+(e instanceof Error?e.message:String(e)));}finally{setBusy(false);}
+  setBusy(true);try{const [a,d]=await Promise.all([supabase.from("block_station_allocations").select("id",{count:"exact",head:true}).eq("district_id",districtId).eq("station_id",st.id),supabase.from("staff_assignments").select("id",{count:"exact",head:true}).eq("district_id",districtId).eq("station_id",st.id)]);if(a.error||d.error)throw a.error||d.error;if((a.count||0)+(d.count||0)>0)throw new Error("This station still has block allocations or duty assignments. Move its blocks and resolve assignments first.");const {error}=await supabase.from("polling_stations").delete().eq("id",st.id).eq("district_id",districtId);if(error)throw error;const numbering=await supabase.rpc("refresh_polling_station_numbers",{p_district_id:districtId});if(numbering.error)throw numbering.error;await loadDistrictData();setNotice("Polling station deleted and station numbering refreshed.");}catch(e){setNotice("Station deletion blocked: "+(e instanceof Error?e.message:String(e)));}finally{setBusy(false);}
  }
  async function moveBlockAllocation(a:any,targetId:string){
   if(!targetId||targetId===a.station_id)return;const target=stations.find(x=>x.id===targetId);if(!target)return;
@@ -184,7 +184,7 @@ export default function App(){
    if(!table||!payload)throw new Error("This record type is not editable here.");
    const q=record?.id?await (supabase as any).from(table).update(payload).eq("id",record.id).eq("district_id",districtId):await (supabase as any).from(table).insert(payload);
    if(q.error)throw q.error;
-   setRecordModal(null);await loadDistrictData();const refreshed=await fetchAllDistrictRows(table,"*",districtId);if(refreshed.error)throw refreshed.error;setUploadRecords(refreshed.data||[]);setNotice((record?"Record updated":"New record added")+" in "+kind+". Operational database fields and source data were saved.");
+   setRecordModal(null);if(kind==="Polling Stations"){const numbering=await supabase.rpc("refresh_polling_station_numbers",{p_district_id:districtId});if(numbering.error)throw numbering.error;}await loadDistrictData();const refreshed=await fetchAllDistrictRows(table,"*",districtId);if(refreshed.error)throw refreshed.error;setUploadRecords(refreshed.data||[]);setNotice((record?"Record updated":"New record added")+" in "+kind+". Operational database fields and source data were saved.");
   }catch(e){setNotice("Save failed: "+(e instanceof Error?e.message:String(e)));}finally{setBusy(false);}
  }
  async function deleteMasterRecord(kind:string,r:any){
