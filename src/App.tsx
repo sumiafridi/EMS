@@ -287,9 +287,9 @@ export default function App(){
  async function importData(file?:File){
   if(!file||!districtId)return;setBusy(true);setIssues([]);setNotice("Reading "+file.name+"…");
   try{
-   const wb=XLSX.read(await file.arrayBuffer(),{type:"array"});const sheet=wb.Sheets[wb.SheetNames[0]];const parsed=XLSX.utils.sheet_to_json<DataRow>(sheet,{defval:""}).map((r,i)=>({...r,__import_order:i+2}));
-   if(!parsed.length)throw new Error("The first worksheet has no data rows.");
-   const headers=Object.keys(parsed[0]);const missing=required.filter(x=>!headers.includes(x));if(missing.length)throw new Error("Required columns missing: "+missing.join(", "));
+   const wb=XLSX.read(await file.arrayBuffer(),{type:"array"});let parsed:DataRow[]=[],selectedSheet="",bestScore=-1;for(const sheetName of wb.SheetNames){const matrix=XLSX.utils.sheet_to_json<any[]>(wb.Sheets[sheetName],{header:1,defval:""});for(let h=0;h<Math.min(matrix.length,20);h++){const headers=(matrix[h]||[]).map((v:any)=>String(v??"").trim());const score=required.filter(x=>headers.includes(x)).length;if(score>bestScore){bestScore=score;selectedSheet=sheetName;const keys=headers;parsed=matrix.slice(h+1).filter((r:any[])=>r.some(v=>String(v??"").trim()!=="")).map((r:any[],i:number)=>Object.fromEntries(keys.map((k:string,j:number)=>[k,r[j]??""])) as DataRow[]).map((r:any,i:number)=>({...r,__import_order:h+i+2}));}}}
+   if(!parsed.length)throw new Error("No DATA rows found in any worksheet. Check the DATA headings and try again.");
+   const headers=Object.keys(parsed[0]);const missing=required.filter(x=>!headers.includes(x));if(missing.length)throw new Error("The best matching worksheet ("+selectedSheet+") is missing required columns: "+missing.join(", "));
    const problems:string[]=[];parsed.forEach((r,i)=>{if(!String(r.Tehsil||"").trim())problems.push("Row "+(i+2)+": Tehsil is blank");if(!String(r["No & Name of Polling Station"]||"").trim())problems.push("Row "+(i+2)+": polling station name is blank");if(!String(r["Census Block Code"]||"").trim())problems.push("Row "+(i+2)+": Census Block Code is blank");});
    setIssues(problems.slice(0,300));let sent=0;
    for(let i=0;i<parsed.length;i+=chunkSize){
