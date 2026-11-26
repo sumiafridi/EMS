@@ -100,14 +100,14 @@ export default function App(){
   setBusy(true);setIssues([]);setNotice("Reading original Kohat HTML backup…");
   try{
    const html=await file.text();
-   const match=html.match(/const\\s+DEFAULT_DATA\\s*=\\s*(\\{[\\s\\S]*?\\});\\s*<\\/script>/);
-   if(!match)throw new Error("This file does not contain the original DEFAULT_DATA backup. Select the saved Kohat HTML version, not the deployed website.");
-   const payload=JSON.parse(match[1]);
+   const marker="const DEFAULT_DATA = ";const markerAt=html.indexOf(marker);const scriptEnd=markerAt>=0?html.indexOf(";</script>",markerAt):-1;
+   if(markerAt<0||scriptEnd<0)throw new Error("This file does not contain the original DEFAULT_DATA backup. Select the saved Kohat HTML version, not the deployed website.");
+   const payload=JSON.parse(html.slice(markerAt+marker.length,scriptEnd));
    const dataRows=payload?.data?.rows||[],staffRows=payload?.staff?.rows||[],trainerRows=payload?.master_trainers||[],venueRows=payload?.training_venues||[];
    const districtName=String(dataRows[0]?.District||payload?.settings?.["District (auto from DATA)"]||"").trim();
    if(districtName.toLowerCase()!==(activeDistrict?.name||"").toLowerCase())throw new Error("Backup district is "+(districtName||"unspecified")+", but the selected workspace is "+(activeDistrict?.name||"unspecified")+". Select Kohat before importing.");
    if(!dataRows.length||!staffRows.length)throw new Error("Backup is incomplete: DATA and Staff sheets must both contain records.");
-   if(!confirm("Import operational records from "+file.name+" into "+activeDistrict?.name+"?\\n\\nDATA source rows detected: "+dataRows.length.toLocaleString()+" (existing DATA will not be overwritten)\\nStaff: "+staffRows.length.toLocaleString()+"\\nMaster trainers: "+trainerRows.length+"\\nVenue/classroom records: "+venueRows.length+"\\n\\nExisting records are preserved; matching CNICs and existing settings are skipped."))return;
+   if(!confirm("Import operational records from "+file.name+" into "+activeDistrict?.name+"?\n\nDATA source rows detected: "+dataRows.length.toLocaleString()+" (existing DATA will not be overwritten)\nStaff: "+staffRows.length.toLocaleString()+"\nMaster trainers: "+trainerRows.length+"\nVenue/classroom records: "+venueRows.length+"\n\nExisting records are preserved; matching CNICs and existing settings are skipped."))return;
    const {data:tehsilRows,error:tehsilError}=await supabase.from("election_tehsils").select("id,name").eq("district_id",districtId);
    if(tehsilError)throw tehsilError;
    const tehsilIds=new Map((tehsilRows||[]).map(x=>[String(x.name).trim().toLowerCase(),x.id]));
