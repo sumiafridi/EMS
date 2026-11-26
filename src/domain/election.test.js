@@ -66,3 +66,17 @@ test("Combined station preserves legacy asymmetric APO calculation", () => {
 test("missing tehsil rows are excluded as in legacy source", () => {
   assert.equal(buildStations([row({ Tehsil: "" })]).length, 0);
 });
+
+test("district demand rules override default staffing formulas", () => {
+  const rules = [
+    { "Duty Role": "Presiding Officer", "Station Type": "Male", "Required Gender": "Male", Basis: "Station", "Posts per Unit": "2", "Adjustment per Station": "" },
+    { "Duty Role": "Senior Assistant Presiding Officer", "Station Type": "Male", "Required Gender": "Male", Basis: "Station", "Posts per Unit": "1", "Adjustment per Station": "" },
+    { "Duty Role": "Assistant Presiding Officer", "Station Type": "Male", "Required Gender": "Male", Basis: "Male booth", "Posts per Unit": "2", "Adjustment per Station": "-1" },
+    { "Duty Role": "Polling Officer", "Station Type": "Male", "Required Gender": "Male", Basis: "Male booth", "Posts per Unit": "1", "Adjustment per Station": "" },
+  ];
+  const [d] = calculateDemand(buildStations([row()]), rules);
+  assert.deepEqual(
+    [d.presMale, d.srapoMale, d.apoMale, d.poMale, d.totalDemand, d.nqMale],
+    [2, 1, 3, 2, 8, 0],
+  );
+});
