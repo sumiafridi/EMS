@@ -186,6 +186,72 @@ export default function App(){
   }
   throw new Error("Rows "+(startRow+1)+"–"+(startRow+part.length)+" failed: "+message);
  }
+ async function generateDutyAssignments(){
+  if(!districtId||!stations.length){setNotice("Import polling-station DATA before generating duty assignments.");return;}
+  if(!staffRecords.length){setNotice("Import Staff Data first. No staff roster is available for allocation.");setSection("Staff Data");return;}
+  if(!confirm("Generate duty assignments for "+(activeDistrict?.name||"this district")+"?\n\nThe engine will assign Presiding Officer and Senior APO first from eligible BPS 16+ staff, then APO and PO from BPS 7–15, followed by surplus BPS 16+ staff. Gender will never be interchanged; home Tehsil is used before cross-Tehsil staff. Existing active assignments will be retained as Superseded history after the new set is safely saved."))return;
+  setBusy(true);setNotice("Preparing staff pools and station demand…");
+  try{
+   const {data:tehsils,error:tehsilError}=await supabase.from("election_tehsils").select("id,name").eq("district_id",districtId);
+   if(tehsilError)throw tehsilError;
+   const tehsilById=new Map<string,string>((tehsils||[]).map((t:any):[string,string]=>[t.id,String(t.name)]));
+   const eligible=staffRecords.map((r:any)=>{const src=r.source_data||{};const name=String(r.name??src["Name of Officer/Official"]??"").trim();const rawGender=String(r.gender??src.Gender??"").trim().toLowerCase();const gender=rawGender==="male"||rawGender==="m"?"Male":rawGender==="female"||rawGender==="f"?"Female":"";const rawBps=String(r.bps_text??src.BPS??"").trim();const bps=/^\d+$/.test(rawBps)?Number(rawBps):null;const rawAvailability=String(r.availability??src["Availability (Y/N)"]??"").trim().toLowerCase();const tehsil=String(src.Tehsil??tehsilById.get(r.tehsil_id)||"").trim();return {id:r.id,name,gender,bps,rawBps,tehsil,availability:rawAvailability,cnic:String(r.cnic??src["CNIC #"]??"").trim(),designation:String(r.designation??src.Designation??"").trim()};}).filter((r:any)=>r.id&&r.name&&r.gender&&r.tehsil&&r.bps!==null&&r.bps>=7&&["y","yes","available"].includes(r.availability));
+   const seniorPool=eligible.filter((r:any)=>r.bps>=16);
+   const juniorPool=eligible.filter((r:any)=>r.bps>=7&&r.bps<=15);
+   seniorPool.sort((a:any,b:any)=>b.bps-a.bps);juniorPool.sort((a:any,b:any)=>b.bps-a.bps);
+   const used=new Set<string>(),generated:any[]=[];
+   const roleDemand=(d:any,role:string,gender:string)=>{const suffix=gender==="Male"?"Male":"Female";const key=role==="Presiding Officer"?"pres":role==="Senior APO"?"srapo":role==="APO"?"apo":"po";return Number(d[key+suffix]||0);};
+   const candidate=(pool:any[],tehsil:string,gender:string,homeOnly:boolean)=>pool.find((r:any)=>!used.has(r.id)&&r.gender===gender&&(homeOnly?r.tehsil.toLowerCase()===tehsil.toLowerCase():true));
+   const fillRole=(role:string,group:string,pool:any[])=>{
+    for(let pass=0;pass<2;pass++){
+     const homeOnly=pass===0;
+     for(const d of calculated){
+      if(!d.id)continue;
+      for(const gender of ["Male","Female"]){
+       const need=roleDemand(d,role,gender);if(!need)continue;
+       const already=generated.filter(x=>x.station_id===d.id&&x.role===role&&x.gender===gender).length;
+       for(let slot=already+1;slot<=need;slot++){
+        const staff=candidate(pool,d.tehsil,gender,homeOnly);if(!staff)break;
+        used.add(staff.id);
+        generated.push({district_id:districtId,staff_id:staff.id,station_id:d.id,role,assignment_status:"Draft",assignment_data:{slot_no:slot,gender,staff_tehsil:staff.tehsil,station_tehsil:d.tehsil,is_cross_tehsil:staff.tehsil.toLowerCase()!==d.tehsil.toLowerCase(),role_group:group,bps_text:staff.rawBps,station_name:d.stationName,council_type:d.councilType,council_no:d.councilNo,council_name:d.councilName,tehsil_ps_no:d.tehsilStationNo,nc_vc_ps_no:d.ncVcStationNo}});
+       }
+      }
+     }
+    }
+   };
+   fillRole("Presiding Officer","Presiding/Sr APO",seniorPool);
+   fillRole("Senior APO","Presiding/Sr APO",seniorPool);
+   fillRole("APO","APO/PO",juniorPool);
+   fillRole("PO","APO/PO",juniorPool);
+   fillRole("APO","APO/PO",seniorPool);
+   fillRole("PO","APO/PO",seniorPool);
+   if(!generated.length&&demand>0)throw new Error("No eligible staff could be assigned. Check staff gender, Tehsil, availability and numeric BPS values.");
+   const insertedIds:string[]=[];
+   for(let i=0;i<generated.length;i+=100){
+    const part=generated.slice(i,i+100);const {data,error}=await supabase.from("staff_assignments").insert(part).select("id");
+    if(error)throw new Error("Assignment rows "+(i+1)+"–"+(i+part.length)+" failed: "+error.message);
+    insertedIds.push(...(data||[]).map((x:any)=>x.id));setNotice("Saving duty assignments: "+insertedIds.length.toLocaleString()+" / "+generated.length.toLocaleString()+"…");
+   }
+   if(insertedIds.length){
+    const oldActive=await supabase.from("staff_assignments").update({assignment_status:"Superseded"}).eq("district_id",districtId).eq("assignment_status","Active");
+    if(oldActive.error)throw new Error("New assignments are saved as Draft, but old active assignments could not be archived: "+oldActive.error.message);
+    for(let i=0;i<insertedIds.length;i+=100){const {error}=await supabase.from("staff_assignments").update({assignment_status:"Active"}).in("id",insertedIds.slice(i,i+100));if(error)throw new Error("Could not activate the new assignment batch: "+error.message);}
+   }
+   const reserveTargets=reserveSummary.categories;
+   const reserveGenerated:any[]=[];
+   const reserveCandidate=(role:string,gender:string)=>{const pools=role==="Presiding Officer"||role==="Senior APO"?[seniorPool]:[juniorPool,seniorPool];for(const pool of pools){const found=pool.find((r:any)=>!used.has(r.id)&&r.gender===gender);if(found)return found;}return null;};
+   for(const target of reserveTargets){for(let n=0;n<target.reserve;n++){const staff=reserveCandidate(target.role,target.gender);if(!staff)break;used.add(staff.id);reserveGenerated.push({district_id:districtId,staff_id:staff.id,reserve_role:target.role,reserve_status:"Available",reserve_data:{gender:staff.gender,bps_text:staff.rawBps,home_tehsil:staff.tehsil,source:"automatic 5% reserve allocation"}});}}
+   if(reserveGenerated.length){
+    for(let i=0;i<reserveGenerated.length;i+=100){const {error}=await supabase.from("reserve_staff").insert(reserveGenerated.slice(i,i+100));if(error)throw new Error("Duty assignments were saved, but reserve rows could not be saved: "+error.message);}
+    const oldReserve=await supabase.from("reserve_staff").update({reserve_status:"Superseded"}).eq("district_id",districtId).eq("reserve_status","Available");
+    if(oldReserve.error)setNotice("Assignments saved; reserve pool was saved but old reserve records could not be archived: "+oldReserve.error.message);
+   }
+   const unfilled=Math.max(0,demand-generated.length),cross=generated.filter(x=>x.assignment_data.is_cross_tehsil).length;
+   await loadDistrictData();
+   setNotice("Duty calculation completed. Assigned "+generated.length.toLocaleString()+" of "+demand.toLocaleString()+" required posts; "+unfilled.toLocaleString()+" remain vacant. Cross-Tehsil assignments: "+cross.toLocaleString()+". Added "+reserveGenerated.length.toLocaleString()+" reserve staff against a 5% target of "+reserveSummary.totalReserve.toLocaleString()+". Non-numeric BPS, unavailable, incomplete or gender/Tehsil-mismatched staff were not guessed or assigned.");
+  }catch(e){setNotice("Duty calculation stopped: "+(e instanceof Error?e.message:String(e))+". Any earlier committed Draft rows are retained; active assignments are not deleted.");}
+  finally{setBusy(false);}
+ }
  async function importData(file?:File){
   if(!file||!districtId)return;setBusy(true);setIssues([]);setNotice("Reading "+file.name+"…");
   try{
