@@ -92,6 +92,7 @@ export default function App(){
   if(kind==="Training Venues")return [norm(pick(row,"Gender","gender")),norm(pick(row,"Venue Name","venue_name")),norm(pick(row,"Classroom Name/No.","Classroom","classroom"))].join("|");
   if(kind==="Demand Rules"){const source=row.rule_data||row;return norm(pick(source,"Rule Key"))||[norm(pick(source,"Duty Role","role")),norm(pick(source,"Station Type","station_type")),norm(pick(source,"Required Gender","gender"))].join("|");}
   if(kind==="Training Plans")return norm(pick(row,"Plan Type","plan_type"));
+  if(kind==="Training Settings")return norm(pick(row,"Training Setting Key","Setting Key","Key","setting_key")).replace(/^training:/,"");
   return norm(pick(row,"Setting Key","Key","setting_key"));
  }
  async function prepareUpload(file?:File,kind=section){
@@ -102,7 +103,7 @@ export default function App(){
    const ws=wb.Sheets[wb.SheetNames[0]];
    const matrix=XLSX.utils.sheet_to_json<any[]>(ws,{header:1,defval:""});
    const cfg=uploadConfig[kind];
-   const aliases:Record<string,string[]>={"Master Trainer Name":["Master Trainer Name","Name","name"],"Venue Name":["Venue Name","venue_name","Name"],"Classroom Name/No.":["Classroom Name/No.","Classroom","classroom"],"Setting Key":["Setting Key","Key","setting_key"]};
+   const aliases:Record<string,string[]>={"Master Trainer Name":["Master Trainer Name","Name","name"],"Venue Name":["Venue Name","venue_name","Name"],"Classroom Name/No.":["Classroom Name/No.","Classroom","classroom"],"Setting Key":["Setting Key","Key","setting_key"],"Training Setting Key":["Training Setting Key","Setting Key","Key","setting_key"]};
    let headerIndex=0,best=0;
    for(let i=0;i<Math.min(matrix.length,20);i++){
     const vals=(matrix[i]||[]).map((v:any)=>String(v??"").trim().toLowerCase());
