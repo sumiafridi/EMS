@@ -87,6 +87,7 @@ export default function App(){
     event:"*",schema:"public",table,filter:"district_id=eq."+districtId
    },scheduleRefresh);
   }
+  channel=channel.on("postgres_changes",{event:"*",schema:"public",table:"global_election_settings"},scheduleRefresh);
   channel.subscribe();
   return ()=>{
    if(refreshTimer)clearTimeout(refreshTimer);
