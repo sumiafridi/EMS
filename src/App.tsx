@@ -434,7 +434,7 @@ export default function App(){
    {label:"Missing mobile",count:staffRecords.filter(r=>!val(r,"mobile","Mobile #")).length},
    {label:"Missing gender",count:staffRecords.filter(r=>!val(r,"gender","Gender")).length},
    {label:"Missing BPS",count:staffRecords.filter(r=>!val(r,"bps_text","BPS")).length},
-   {label:"Missing Tehsil",count:staffRecords.filter(r=>!val(r,"Tehsil")&&!r.tehsil_id).length},
+   {label:"Missing or unmatched Tehsil",count:staffRecords.filter(r=>!r.tehsil_id).length},
    {label:"Missing designation",count:staffRecords.filter(r=>!val(r,"designation","Designation")).length},
    {label:"Duplicate CNIC records",count:duplicateCnic}
   ];
