@@ -600,11 +600,11 @@ export default function App(){
    const morningStart=time("morning_start",planData.morning_start||"09:00"),morningEnd=time("morning_end",planData.morning_end||"12:00");
    const eveningStart=time("evening_start",planData.evening_start||"14:00"),eveningEnd=time("evening_end",planData.evening_end||"17:00");
    const batchStart:number[]=[];
-   const venueRows=venueRecords.filter(v=>{const g=String(v.source_data?.gender||"").toLowerCase();return g==="male"||g==="female";});
+   const venueRows=venueRecords.filter(v=>{const g=String(v.gender_group||v.source_data?.gender||"").toLowerCase();return (g==="male"||g==="female")&&String(v.availability??v.source_data?.availability??"yes").toLowerCase()!=="no";});
    let batchNumber=0;
    for(const gender of ["Male","Female"]){
     const g=gender.toLowerCase();
-    const venues=venueRows.filter(v=>String(v.source_data?.gender||"").toLowerCase()===g&&String(v.source_data?.availability||"yes").toLowerCase()!=="no").sort((a,b)=>String(a.source_data?.classroom||a.address||"").localeCompare(String(b.source_data?.classroom||b.address||"")));
+    const venues=venueRows.filter(v=>String(v.gender_group||v.source_data?.gender||"").toLowerCase()===g).sort((a,b)=>String(a.classroom||a.source_data?.classroom||a.address||"").localeCompare(String(b.classroom||b.source_data?.classroom||b.address||"")));
     if(!venues.length)throw new Error("No "+gender+" classroom is available for "+roleGroup+". Add or update its venue records.");
     const requiredSeats=trainingProjection.groups.find(x=>x.group===roleGroup&&x.gender===gender)?.seats||0;
     const neededBatches=Math.ceil(requiredSeats/cap);
@@ -616,17 +616,17 @@ export default function App(){
      let batchDate=start;for(let d=0;d<daySlot*duration;d++)batchDate=addWorkingDays(batchDate,1);
      let lastDate=batchDate;for(let d=1;d<duration;d++)lastDate=addWorkingDays(lastDate,1);
      if(!workingDate(batchDate)||lastDate>end||batchDate>end)throw new Error(roleGroup+" "+gender+" schedule exceeds its saved end date "+end+". Extend the plan dates or adjust capacity/duration.");
-     const venue=venues[roomSlot%venues.length],vFrom=String(venue.source_data?.available_from||"");const vTo=String(venue.source_data?.available_to||"");
+     const venue=venues[roomSlot%venues.length],vFrom=String(venue.available_from||venue.source_data?.available_from||"");const vTo=String(venue.available_to||venue.source_data?.available_to||"");
      if(vFrom&&batchDate<vFrom||vTo&&lastDate>vTo)throw new Error("Venue "+venue.name+" is not available for "+batchDate+" to "+lastDate+". Update venue availability or the plan dates.");
      const sessionName=sessionNo===0?"Morning":"Evening";
-     const sessionValue=String(venue.source_data?.sessions||"Both").toLowerCase();
+     const sessionValue=String(venue.available_sessions||venue.source_data?.sessions||"Both").toLowerCase();
      if(sessionValue!=="both"&&sessionValue!==sessionName.toLowerCase())throw new Error("Venue "+venue.name+" is not available for the "+sessionName+" session.");
      const targetSeats=Math.min(cap,Math.max(0,requiredSeats-bi*cap));
      const selected=ordered.slice(participantIndex,participantIndex+targetSeats);participantIndex+=selected.length;
      const trainers=trainerRecords.filter(t=>String(t.gender||"").toLowerCase()===g);
      if(!trainers.length)throw new Error("No "+gender+" master trainer is available for "+roleGroup+". Add a trainer before generating batches.");
      const trainer=trainers[bi%trainers.length];batchNumber++;
-     const batch_data={generation_status:"Draft",required_seats:targetSeats,assigned_seats:selected.length,missing_staff_count:Math.max(0,targetSeats-selected.length),end_date:lastDate,duration_days:duration,session:sessionName,classroom:venue.source_data?.classroom||venue.address,venue_name:venue.name,master_trainer_id:trainer.id,master_trainer_name:trainer.name,include_sunday:includeSunday};
+     const batch_data={generation_status:"Draft",required_seats:targetSeats,assigned_seats:selected.length,missing_staff_count:Math.max(0,targetSeats-selected.length),end_date:lastDate,duration_days:duration,session:sessionName,classroom:venue.classroom||venue.source_data?.classroom||venue.address,venue_name:venue.name,master_trainer_id:trainer.id,master_trainer_name:trainer.name,include_sunday:includeSunday};
      batchesToSave.push({district_id:districtId,plan_id:plan.id,batch_number:batchNumber,training_date:batchDate,start_time:sessionNo===0?morningStart:eveningStart,end_time:sessionNo===0?morningEnd:eveningEnd,gender_group:gender,role_group:roleGroup,venue_id:venue.id,capacity:cap,batch_data});
      selected.forEach(p=>{usedPeople.add(p.staff_id);participantsToSave.push({plan_id:plan.id,batch_number:batchNumber,staff_id:p.staff_id,status:"Assigned",participant_data:{role:p.role,gender,staff_name:p.name,source:p.source,training_group:roleGroup}});});
     }
@@ -955,9 +955,9 @@ export default function App(){
   const invalidMobile=staffRecords.filter(r=>{const d=val(r,"mobile","Mobile #").replace(/\D/g,"");return d.length>0&&!(d.length===11&&d.startsWith("03"));}).length;
   const trainerMale=trainerRecords.filter(r=>val(r,"gender","Gender").toLowerCase()==="male").length;
   const trainerFemale=trainerRecords.filter(r=>val(r,"gender","Gender").toLowerCase()==="female").length;
-  const availableVenues=venueRecords.filter(r=>["yes","y","available","true","1"].includes(String(r.source_data?.availability??r.source_data?.["Availability (Yes/No)"]??"Yes").toLowerCase()));
-  const venueMale=availableVenues.filter(r=>String(r.source_data?.gender??r.source_data?.Gender??"").toLowerCase()==="male").length;
-  const venueFemale=availableVenues.filter(r=>String(r.source_data?.gender??r.source_data?.Gender??"").toLowerCase()==="female").length;
+  const availableVenues=venueRecords.filter(r=>["yes","y","available","true","1"].includes(String(r.availability??r.source_data?.availability??r.source_data?.["Availability (Yes/No)"]??"Yes").toLowerCase()));
+  const venueMale=availableVenues.filter(r=>String(r.gender_group??r.source_data?.gender??r.source_data?.Gender??"").toLowerCase()==="male").length;
+  const venueFemale=availableVenues.filter(r=>String(r.gender_group??r.source_data?.gender??r.source_data?.Gender??"").toLowerCase()==="female").length;
   const venueCapacity=availableVenues.reduce((n,r)=>n+Number(r.capacity||0),0);
   const present=attendanceRecords.filter(r=>["present","attended"].includes(String(r.status||"").toLowerCase())).length;
   const absent=attendanceRecords.filter(r=>String(r.status||"").toLowerCase()==="absent").length;
