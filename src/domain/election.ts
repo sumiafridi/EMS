@@ -7,7 +7,7 @@ export interface DataRow {
   "Council Type (NC / VC)"?: unknown;
   "Council No"?: unknown;
   "Council Name"?: unknown;
-  "PS No"?: unknown;
+  "PS No"?: unknown;\n  "NC/VC PS No"?: unknown;\n  "Tehsil PS No"?: unknown;
   "No & Name of Polling Station"?: unknown;
   "PS Type (Male / Female / Combined)"?: unknown;
   "Booths Male"?: unknown;
