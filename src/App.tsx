@@ -735,16 +735,23 @@ export default function App(){
    const inserted:any[]=[];for(let i=0;i<batchesToSave.length;i+=100){const q=await supabase.from("training_batches").insert(batchesToSave.slice(i,i+100)).select("id,plan_id,batch_number");if(q.error)throw q.error;inserted.push(...(q.data||[]));setNotice("Saved "+inserted.length+" / "+batchesToSave.length+" batches…");}
    const idByBatch=new Map(inserted.map(b=>[b.plan_id+":"+b.batch_number,b.id]));
    const participantRows=participantsToSave.map(p=>({district_id:districtId,plan_id:p.plan_id,batch_id:idByBatch.get(p.plan_id+":"+p.batch_number),staff_id:p.staff_id,status:p.status,participant_data:p.participant_data})).filter(p=>p.batch_id);
-   const existingParticipants=await supabase.from("training_participants").select("id,plan_id,staff_id,status").eq("district_id",districtId);
+   const existingParticipants=await supabase.from("training_participants").select("id,plan_id,staff_id,status").eq("district_id",districtId).order("created_at",{ascending:true});
    if(existingParticipants.error)throw existingParticipants.error;
-   const existingByStaff=new Map((existingParticipants.data||[]).map((p:any)=>[p.plan_id+":"+p.staff_id,p]));
+   const existingByStaff=new Map((existingParticipants.data||[]).filter((p:any)=>!["historical","superseded"].includes(String(p.status||"").toLowerCase())).map((p:any)=>[p.plan_id+":"+p.staff_id,p]));
    const scheduledKeys=new Set(participantRows.map(p=>p.plan_id+":"+p.staff_id));
    for(let i=0;i<participantRows.length;i++){
     const p=participantRows[i],key=p.plan_id+":"+p.staff_id,existing:any=existingByStaff.get(key);
     if(existing){
      const hasAttendance=attendanceRecords.some((a:any)=>a.participant_id===existing.id);
-     const {error}=await supabase.from("training_participants").update({batch_id:p.batch_id,status:hasAttendance?existing.status:"Assigned",participant_data:p.participant_data}).eq("id",existing.id).eq("district_id",districtId);
-     if(error)throw error;
+     if(hasAttendance){
+      const archived=await supabase.from("training_participants").update({status:"Historical"}).eq("id",existing.id).eq("district_id",districtId);
+      if(archived.error)throw archived.error;
+      const {error}=await supabase.from("training_participants").insert(p);
+      if(error)throw error;
+     }else{
+      const {error}=await supabase.from("training_participants").update({batch_id:p.batch_id,status:"Assigned",participant_data:p.participant_data}).eq("id",existing.id).eq("district_id",districtId);
+      if(error)throw error;
+     }
     }else{
      const {error}=await supabase.from("training_participants").insert(p);
      if(error)throw error;
@@ -753,8 +760,8 @@ export default function App(){
    }
    const oldParticipants=(existingParticipants.data||[]).filter((p:any)=>!scheduledKeys.has(p.plan_id+":"+p.staff_id));
    for(const p of oldParticipants){
-    if(attendanceRecords.some((a:any)=>a.participant_id===p.id))continue;
-    const {error}=await supabase.from("training_participants").update({status:"Superseded"}).eq("id",p.id).eq("district_id",districtId);
+    const hasAttendance=attendanceRecords.some((a:any)=>a.participant_id===p.id);
+    const {error}=await supabase.from("training_participants").update({status:hasAttendance?"Historical":"Superseded"}).eq("id",p.id).eq("district_id",districtId);
     if(error)throw error;
    }
    for(const old of batchRecords){
