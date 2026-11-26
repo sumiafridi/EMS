@@ -1,4 +1,3 @@
 import { createClient } from "@supabase/supabase-js";
-const url = import.meta.env.VITE_SUPABASE_URL as string;
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-export const supabase = createClient(url, key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+// Supabase URL and publishable key are public client configuration; database access is enforced by RLS and authenticated roles.
+export const supabase = createClient("https://rqjaxrlmwccczcfwwvam.supabase.co", "sb_publishable_WYK2hex5BgUJQ66YdW1LCw_KB93E3Yv", { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
