@@ -517,16 +517,16 @@ export default function App(){
   finally{setBusy(false);}
  }
 
- async function uploadBatchWithSplit(part:DataRow[],startRow:number):Promise<number>{
+ async function uploadBatchWithSplit(part:DataRow[],startRow:number,importId?:string):Promise<number>{
   const cleanPart=part.map((r:any)=>Object.fromEntries(Object.entries(r).filter(([k]:[string,any])=>k!=="__excel_row")));const {data,error}=await supabase.rpc("import_district_data_rows",{p_district_id:districtId,p_rows:cleanPart});
-  if(!error){const result:any=data||{};if(Array.isArray(result.row_errors)&&result.row_errors.length)setIssues(prev=>[...prev,...result.row_errors.map((x:any)=>"DATA Excel row "+(Number(part[Number(x.batch_row||1)-1]?.__excel_row)||startRow+Number(x.batch_row||1)+1)+": "+x.reason)]);return Number(result.rows_processed??part.length);}
+  if(!error){const result:any=data||{};if(Array.isArray(result.row_errors)&&result.row_errors.length){const messages=result.row_errors.map((x:any)=>"Excel row "+(Number(part[Number(x.batch_row||1)-1]?.__excel_row)||startRow+Number(x.batch_row||1)+1)+": "+x.reason);setIssues(prev=>[...prev,...messages.map(x=>"DATA "+x)]);if(importId)await persistImportIssues(importId,"DATA",messages,part);}return Number(result.rows_processed??part.length);}
   const message=error.message||"Database import failed";
   const timedOut=/statement timeout|timeout|canceling statement/i.test(message);
   if(timedOut&&part.length>1){
    const middle=Math.ceil(part.length/2);
    setNotice("A database batch was slow. Automatically splitting rows "+(startRow+1)+"–"+(startRow+part.length)+" into smaller safe batches…");
-   const first=await uploadBatchWithSplit(part.slice(0,middle),startRow);
-   const second=await uploadBatchWithSplit(part.slice(middle),startRow+middle);
+   const first=await uploadBatchWithSplit(part.slice(0,middle),startRow,importId);
+   const second=await uploadBatchWithSplit(part.slice(middle),startRow+middle,importId);
    return first+second;
   }
   throw new Error("Rows "+(startRow+1)+"–"+(startRow+part.length)+" failed: "+message);
@@ -676,7 +676,7 @@ export default function App(){
   finally{setBusy(false);}
  }
  async function importData(file?:File){
-  if(!file||!districtId)return;setBusy(true);setIssues([]);setNotice("Reading "+file.name+"…");
+  if(!file||!districtId)return;setBusy(true);setIssues([]);setNotice("Reading "+file.name+"…");let dataImportId:string|null=null;
   try{
    const wb=XLSX.read(await file.arrayBuffer(),{type:"array",cellDates:true});let parsed:DataRow[]=[],selectedSheet="",headerRow=1,bestScore=-1,bestRank=999;
    const dataAliases:Record<string,string[]>={"District":["District","District Name"],"Tehsil":["Tehsil","Tehsil Name"],"Council Type (NC / VC)":["Council Type (NC / VC)","Council Type","NC/VC Type"],"Council No":["Council No","Council Number","Council #"],"Council Name":["Council Name","Name of Council"],"PS No":["PS No","Polling Station No","PS Number","Polling Station Number"],"No & Name of Polling Station":["No & Name of Polling Station","Polling Station Name","Name of Polling Station"],"PS Type (Male / Female / Combined)":["PS Type (Male / Female / Combined)","Polling Station Type","Station Type"],"Census Block Code":["Census Block Code","Block Code","Census Block"],"Booths Male":["Booths Male","Male Booths"],"Booths Female":["Booths Female","Female Booths"],"Male Voters (block)":["Male Voters (block)","Male Voters","Male Voters Block"],"Female Voters (block)":["Female Voters (block)","Female Voters","Female Voters Block"],"Electoral Area name":["Electoral Area name","Electoral Area"]};
@@ -688,6 +688,7 @@ export default function App(){
    parsed=selected.matrix.slice(selected.headerIndex+1).map((r:any[],dataIndex:number)=>({r,dataIndex})).filter(({r}:any)=>r.some((v:any)=>String(v??"").trim()!=="")).map(({r,dataIndex}:any)=>{const rawRow:any={};selected.rawHeaders.forEach((h:string,j:number)=>{if(h)rawRow[h]=r[j]??"";});const canonical:any={};for(const key of Object.keys(dataAliases)){const idx=mapping[key];if(idx>=0)canonical[key]=r[idx]??"";}return {...rawRow,...canonical,__excel_row:selected.headerIndex+dataIndex+2} as DataRow;});
    if(!parsed.length)throw new Error("No DATA rows found in worksheet "+selectedSheet+".");
    const sourceDistricts=[...new Set(parsed.map((r:any)=>String(r.District||"").trim()).filter(Boolean))];if(sourceDistricts.length>1)throw new Error("This DATA workbook contains multiple districts ("+sourceDistricts.join(", ")+"). Upload one district at a time.");if(sourceDistricts.length===1&&norm(sourceDistricts[0])!==norm(activeDistrict?.name))throw new Error("The workbook belongs to "+sourceDistricts[0]+", but the selected district is "+(activeDistrict?.name||"unknown")+". Select the matching district before importing.");
+   dataImportId=await beginImportAudit("DATA",file.name,parsed.length);
    const errors:string[]=[],valid:DataRow[]=[],seenAllocations=new Set<string>(),stationMeta=new Map<string,string>(),blockSegments=new Map<string,Map<string,string>>(),existingBlockSegments=new Map<string,Set<string>>();
    const normValue=(v:any)=>String(v??"").trim().toLowerCase();
    const blockCodeById=new Map(blockRecords.map((x:any)=>[x.id,normValue(x.block_code||x.source_data?.["Census Block Code"])]));
@@ -711,11 +712,12 @@ export default function App(){
     else valid.push(r);
    });
    setIssues(errors.slice(0,1000));
-   if(!valid.length){setRows([]);setNotice("No DATA rows passed validation. "+errors.length+" row(s) need correction; no database records were changed.");return;}
-   let sent=0;for(let i=0;i<valid.length;i+=chunkSize){const part=valid.slice(i,i+chunkSize);setNotice("Uploading valid DATA rows "+(i+1)+"–"+Math.min(i+part.length,valid.length)+" of "+valid.length+"…");sent+=await uploadBatchWithSplit(part,i);}
+   if(!valid.length){setRows([]);const issueCount=await persistImportIssues(dataImportId,"DATA",errors,parsed);await finishImportAudit(dataImportId,"Needs correction",{rows_received:parsed.length,rows_inserted:0,issues:issueCount});await loadDistrictData();setNotice("DATA import review saved: "+parsed.length+" source rows and "+issueCount+" validation issue(s) recorded. No master records were changed.");return;}
+   let sent=0;for(let i=0;i<valid.length;i+=chunkSize){const part=valid.slice(i,i+chunkSize);setNotice("Uploading valid DATA rows "+(i+1)+"–"+Math.min(i+part.length,valid.length)+" of "+valid.length+"…");sent+=await uploadBatchWithSplit(part,i,dataImportId);}
    const numbering=await supabase.rpc("refresh_polling_station_numbers",{p_district_id:districtId});if(numbering.error)throw new Error("DATA rows imported, but polling-station numbering refresh failed: "+numbering.error.message);
-   setRows(valid);await loadDistrictData();setNotice("DATA import completed: "+sent+" valid rows saved; "+errors.length+" rows held for correction. Original columns are retained in source_data. Existing omitted records were not deleted.");setSection("Overview");
-  }catch(e){setNotice("Import stopped: "+(e instanceof Error?e.message:String(e))+". Rows already committed in earlier batches remain saved; refresh before retrying.");}
+   const issueCount=await persistImportIssues(dataImportId,"DATA",errors,parsed);await finishImportAudit(dataImportId,errors.length||issueCount?"Imported with issues":"Imported",{rows_received:parsed.length,valid_rows:valid.length,rows_processed:sent,issues:issueCount+errors.length});
+   setRows(valid);await loadDistrictData();setNotice("DATA import completed: "+sent+" valid rows saved; "+(errors.length+issueCount)+" rows/issues recorded for correction. Original columns are retained in source_data. Existing omitted records were not deleted.");setSection("Overview");
+  }catch(e){if(dataImportId){try{await finishImportAudit(dataImportId,"Failed",{error:e instanceof Error?e.message:String(e)});}catch{}}setNotice("Import stopped: "+(e instanceof Error?e.message:String(e))+". Rows already committed in earlier batches remain saved; refresh before retrying.");}
   finally{setBusy(false);if(input.current)input.current.value="";}
  }
 
