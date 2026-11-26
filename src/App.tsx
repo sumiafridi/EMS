@@ -105,7 +105,8 @@ export default function App(){
    if(!headers.some(Boolean))throw new Error("No column headings found in the first 20 rows.");
    const parsed=matrix.slice(headerIndex+1).filter((r:any[])=>r.some(v=>String(v??"").trim()!=="")).map((r:any[],i:number)=>Object.fromEntries(headers.map((h:string,j:number)=>[h,r[j]??""])));
    if(!parsed.length)throw new Error("No data rows found under the detected headings.");
-   const aliases:Record<string,string[]>={"Master Trainer Name":["Master Trainer Name","Name","name"],"Venue Name":["Venue Name","venue_name","Name"],"Classroom Name/No.":["Classroom Name/No.","Classroom","classroom"],"Setting Key":["Setting Key","Key","setting_key"]};\n   const missing=cfg.required.filter(h=>!(aliases[h]||[h]).some(a=>headers.includes(a)));
+   const aliases:Record<string,string[]>={"Master Trainer Name":["Master Trainer Name","Name","name"],"Venue Name":["Venue Name","venue_name","Name"],"Classroom Name/No.":["Classroom Name/No.","Classroom","classroom"],"Setting Key":["Setting Key","Key","setting_key"]};
+   const missing=cfg.required.filter(h=>!(aliases[h]||[h]).some(a=>headers.includes(a)));
    const warnings:string[]=[];
    if(missing.length)warnings.push("Expected headings not found: "+missing.join(", ")+". The importer will still preserve the rows and map available columns.");
    parsed.forEach((r:any,i:number)=>{cfg.required.forEach(h=>{if(!String(r[h]??"").trim())warnings.push("Row "+(headerIndex+i+2)+": "+h+" is blank.");});});
