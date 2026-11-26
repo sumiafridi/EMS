@@ -414,6 +414,8 @@ export default function App(){
   const roles=[{label:"Presiding Officer",m:"presMale",f:"presFemale"},{label:"Senior APO",m:"srapoMale",f:"srapoFemale"},{label:"APO",m:"apoMale",f:"apoFemale"},{label:"Polling Officer",m:"poMale",f:"poFemale"},{label:"Naib Qasid",m:"nqMale",f:"nqFemale"}];
   const assignedRows=dashboard.tehsils.flatMap(t=>roles.map(r=>{const male=assignedFor(t.name,r.label,"Male"),female=assignedFor(t.name,r.label,"Female");return {tehsil:t.name,role:r.label,male,female,total:male+female};}));
   const vacancyRows=dashboard.tehsils.flatMap(t=>roles.map(r=>{const male=Math.max(0,Number((t as any)[r.m]||0)-assignedFor(t.name,r.label,"Male")),female=Math.max(0,Number((t as any)[r.f]||0)-assignedFor(t.name,r.label,"Female"));return {tehsil:t.name,role:r.label,male,female,total:male+female};}));
+  const cnicCounts=new Map<string,number>();staffRecords.forEach(r=>{const d=val(r,"cnic","CNIC #").replace(/\D/g,"");if(d)cnicCounts.set(d,(cnicCounts.get(d)||0)+1);});
+  const duplicateCnic=[...cnicCounts.values()].filter(n=>n>1).reduce((n,x)=>n+x,0);
   const staffIssues=[
    {label:"Missing name",count:staffRecords.filter(r=>!val(r,"name","Name of Officer/Official")).length},
    {label:"Missing CNIC",count:staffRecords.filter(r=>!val(r,"cnic","CNIC #")).length},
@@ -424,8 +426,6 @@ export default function App(){
    {label:"Missing designation",count:staffRecords.filter(r=>!val(r,"designation","Designation")).length},
    {label:"Duplicate CNIC records",count:duplicateCnic}
   ];
-  const cnicCounts=new Map<string,number>();staffRecords.forEach(r=>{const d=val(r,"cnic","CNIC #").replace(/\D/g,"");if(d)cnicCounts.set(d,(cnicCounts.get(d)||0)+1);});
-  const duplicateCnic=[...cnicCounts.values()].filter(n=>n>1).reduce((n,x)=>n+x,0);
   const invalidCnic=staffRecords.filter(r=>{const d=val(r,"cnic","CNIC #").replace(/\D/g,"");return d.length>0&&d.length!==13;}).length;
   const invalidMobile=staffRecords.filter(r=>{const d=val(r,"mobile","Mobile #").replace(/\D/g,"");return d.length>0&&!(d.length===11&&d.startsWith("03"));}).length;
   const trainerMale=trainerRecords.filter(r=>val(r,"gender","Gender").toLowerCase()==="male").length;
