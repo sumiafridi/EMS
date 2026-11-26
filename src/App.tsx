@@ -89,7 +89,7 @@ export default function App(){
  }
 
  const dashboard=useMemo(()=>{
-  const sum=(items,key)=>items.reduce((n,x)=>n+Number(x[key]||0),0);
+  const sum=(items:any[],key:string):number=>items.reduce((n:number,x:any)=>n+Number(x[key]||0),0);
   const councils=new Set(stations.map(s=>[String(s.source_data?.Tehsil??"").trim(),String(s.source_data?.["Council Type (NC / VC)"]??"").trim(),String(s.source_data?.["Council No"]??"").trim(),String(s.source_data?.["Council Name"]??"").trim()].join("|")));
   const tehsilMap=new Map<string,{name:string;stations:number;blocks:number;maleVoters:number;femaleVoters:number;maleBooths:number;femaleBooths:number;councils:Set<string>;demand:number;presMale:number;presFemale:number;srapoMale:number;srapoFemale:number;apoMale:number;apoFemale:number;poMale:number;poFemale:number}>();
   for(const s of stations){
