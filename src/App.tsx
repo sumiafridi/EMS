@@ -23,7 +23,8 @@ export default function App(){
  const [trainingDraft,setTrainingDraft]=useState<Record<string,string>>({});
  const [problemFilter,setProblemFilter]=useState(""),[recordSearch,setRecordSearch]=useState(""),[allocationSearch,setAllocationSearch]=useState("");
  const [newDistrictName,setNewDistrictName]=useState("");
- const [newDistrictCode,setNewDistrictCode]=useState("");\n const [recordModal,setRecordModal]=useState<{kind:string;record:any|null}|null>(null);\n const [recordDraft,setRecordDraft]=useState<Record<string,string>>({});
+ const [newDistrictCode,setNewDistrictCode]=useState("");\n const [recordModal,setRecordModal]=useState<{kind:string;record:any|null}|null>(null);
+ const [recordDraft,setRecordDraft]=useState<Record<string,string>>({});
  const uploadConfig:Record<string,{table:string;title:string;description:string;headers:string[];required:string[]}> = {
   "Staff Data":{table:"election_staff",title:"Staff Data / Employee Roster",description:"Import the complete employee roster. CNIC is used as the main identity; source S.No is retained as a fallback. Original BPS and all source columns are preserved.",headers:["S.No","Tehsil","Name of Officer/Official","Gender","CNIC #","Department","Designation","BPS","Place of Posting","Qualification","Date of Retirement","Mobile #","Availability (Y/N)"],required:["Tehsil","Name of Officer/Official","Gender"]},
   "Master Trainers":{table:"master_trainers",title:"Master Trainers",description:"Upload male and female master trainers. CNIC is used to update an existing trainer instead of creating duplicates.",headers:["Master Trainer Name","Gender","Designation","Department","BPS","CNIC","Mobile Number"],required:["Master Trainer Name","Gender"]},
@@ -125,7 +126,9 @@ export default function App(){
   if(!confirm("Allocate block "+code+" to "+station.name+" ("+station.station_type+")? The database will prevent duplicate or conflicting gender segments."))return;
   setBusy(true);try{const {error}=await supabase.from("block_station_allocations").insert({district_id:districtId,block_id:block.id,station_id:station.id,allocation_data:{manually_added:true,source:"Block Allocation Manager"}});if(error)throw error;await loadDistrictData();setNotice("Block allocated. Gender segment was assigned from the destination station type.");}catch(e){setNotice("Block allocation rejected: "+(e instanceof Error?e.message:String(e)));}finally{setBusy(false);}
  }
- async function addPollingStation(){editMasterRecord("Polling Stations");}\n async function editPollingStation(st:any){editMasterRecord("Polling Stations",st);}\n function editMasterRecord(kind:string,r?:any){
+ async function addPollingStation(){editMasterRecord("Polling Stations");}
+ async function editPollingStation(st:any){editMasterRecord("Polling Stations",st);}
+ function editMasterRecord(kind:string,r?:any){
   const src=r?.source_data||r?.rule_data||r?.plan_data||{};
   let draft:Record<string,string>={};
   if(kind==="Staff Data")draft={"S.No":String(r?.source_staff_id??src["S.No"]??""),"Name":String(r?.name??src["Name of Officer/Official"]??""),"Gender":String(r?.gender??src.Gender??""),"CNIC":String(r?.cnic??src["CNIC #"]??""),"BPS":String(r?.bps_text??src.BPS??""),"Department":String(r?.department??src.Department??""),"Designation":String(r?.designation??src.Designation??""),"Mobile":String(r?.mobile??src["Mobile #"]??""),"Tehsil":String(src.Tehsil??""),"Availability":String(r?.availability??src["Availability (Y/N)"]??"Y")};
