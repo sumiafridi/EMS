@@ -101,21 +101,21 @@ export default function App(){
    const ws=wb.Sheets[wb.SheetNames[0]];
    const matrix=XLSX.utils.sheet_to_json<any[]>(ws,{header:1,defval:""});
    const cfg=uploadConfig[kind];
+   const aliases:Record<string,string[]>={"Master Trainer Name":["Master Trainer Name","Name","name"],"Venue Name":["Venue Name","venue_name","Name"],"Classroom Name/No.":["Classroom Name/No.","Classroom","classroom"],"Setting Key":["Setting Key","Key","setting_key"]};
    let headerIndex=0,best=0;
    for(let i=0;i<Math.min(matrix.length,20);i++){
     const vals=(matrix[i]||[]).map((v:any)=>String(v??"").trim().toLowerCase());
-    const score=cfg.required.filter(h=>vals.includes(h.toLowerCase())).length;
+    const score=cfg.required.filter(h=>(aliases[h]||[h]).some(a=>vals.includes(a.toLowerCase()))).length;
     if(score>best){best=score;headerIndex=i;}
    }
    const headers=(matrix[headerIndex]||[]).map((v:any)=>String(v??"").trim());
    if(!headers.some(Boolean))throw new Error("No column headings found in the first 20 rows.");
    const parsed=matrix.slice(headerIndex+1).filter((r:any[])=>r.some(v=>String(v??"").trim()!=="")).map((r:any[],i:number)=>Object.fromEntries(headers.map((h:string,j:number)=>[h,r[j]??""])));
    if(!parsed.length)throw new Error("No data rows found under the detected headings.");
-   const aliases:Record<string,string[]>={"Master Trainer Name":["Master Trainer Name","Name","name"],"Venue Name":["Venue Name","venue_name","Name"],"Classroom Name/No.":["Classroom Name/No.","Classroom","classroom"],"Setting Key":["Setting Key","Key","setting_key"]};
    const missing=cfg.required.filter(h=>!(aliases[h]||[h]).some(a=>headers.includes(a)));
    const warnings:string[]=[];
    if(missing.length)warnings.push("Expected headings not found: "+missing.join(", ")+". The importer will still preserve the rows and map available columns.");
-   parsed.forEach((r:any,i:number)=>{cfg.required.forEach(h=>{const aliases:Record<string,string[]>={"Master Trainer Name":["Master Trainer Name","Name","name"],"Venue Name":["Venue Name","venue_name","Name"],"Classroom Name/No.":["Classroom Name/No.","Classroom","classroom"],"Setting Key":["Setting Key","Key","setting_key"]};if(!String(pick(r,...(aliases[h]||[h]))??"").trim()warnings.push("Row "+(headerIndex+i+2)+": "+h+" is blank.");});});
+   parsed.forEach((r:any,i:number)=>{cfg.required.forEach(h=>{if(!String(pick(r,...(aliases[h]||[h]))??"").trim())warnings.push("Row "+(headerIndex+i+2)+": "+h+" is blank.");});});
    if(kind==="Staff Data"){
     const db=await supabase.from("election_tehsils").select("name").eq("district_id",districtId);
     const known=new Set((db.data||[]).map(x=>norm(x.name)));
