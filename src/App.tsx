@@ -101,15 +101,18 @@ export default function App(){
   setBusy(true);setUploadWarnings([]);setUploadRecords([]);setUploadFileName(file.name);setNotice("Reading "+file.name+"…");
   try{
    const wb=XLSX.read(await file.arrayBuffer(),{type:"array"});
-   const ws=wb.Sheets[wb.SheetNames[0]];
-   const matrix=XLSX.utils.sheet_to_json<any[]>(ws,{header:1,defval:""});
    const cfg=uploadConfig[kind];
    const aliases:Record<string,string[]>={"Master Trainer Name":["Master Trainer Name","Name","name"],"Venue Name":["Venue Name","venue_name","Name"],"Classroom Name/No.":["Classroom Name/No.","Classroom","classroom"],"Setting Key":["Setting Key","Key","setting_key"],"Training Setting Key":["Training Setting Key","Setting Key","Key","setting_key"]};
-   let headerIndex=0,best=0;
-   for(let i=0;i<Math.min(matrix.length,20);i++){
-    const vals=(matrix[i]||[]).map((v:any)=>String(v??"").trim().toLowerCase());
-    const score=cfg.required.filter(h=>(aliases[h]||[h]).some(a=>vals.includes(a.toLowerCase()))).length;
-    if(score>best){best=score;headerIndex=i;}
+   let matrix:any[][]=[],headerIndex=0,best=-1,selectedSheet=wb.SheetNames[0]||"";
+   for(const sheetName of wb.SheetNames){
+    const candidate=XLSX.utils.sheet_to_json<any[]>(wb.Sheets[sheetName],{header:1,defval:""});
+    let candidateBest=0,candidateHeader=0;
+    for(let i=0;i<Math.min(candidate.length,20);i++){
+     const vals=(candidate[i]||[]).map((v:any)=>String(v??"").trim().toLowerCase());
+     const score=cfg.required.filter(h=>(aliases[h]||[h]).some(a=>vals.includes(a.toLowerCase()))).length;
+     if(score>candidateBest){candidateBest=score;candidateHeader=i;}
+    }
+    if(candidateBest>best){best=candidateBest;matrix=candidate;headerIndex=candidateHeader;selectedSheet=sheetName;}
    }
    const headers=(matrix[headerIndex]||[]).map((v:any)=>String(v??"").trim());
    if(!headers.some(Boolean))throw new Error("No column headings found in the first 20 rows.");
@@ -124,7 +127,7 @@ export default function App(){
     const known=new Set((db.data||[]).map(x=>norm(x.name)));
     parsed.forEach((r:any,i:number)=>{if(r.Tehsil&&!known.has(norm(r.Tehsil)))warnings.push("Row "+(headerIndex+i+2)+": Tehsil '"+r.Tehsil+"' does not match a district Tehsil; it will be imported with an unresolved Tehsil link.");});
    }
-   setUploadRows(prev=>({...prev,[kind]:parsed}));setUploadWarnings(warnings.slice(0,500));setNotice("Preview ready: "+parsed.length.toLocaleString()+" "+kind+" rows detected. Review warnings, then import.");
+   setUploadRows(prev=>({...prev,[kind]:parsed}));setUploadWarnings(warnings.slice(0,500));setNotice("Preview ready: "+parsed.length.toLocaleString()+" "+kind+" rows detected from worksheet \""+selectedSheet+"\". Review warnings, then import.");
   }catch(e){setNotice("Could not prepare upload: "+(e instanceof Error?e.message:String(e)));}
   finally{setBusy(false);if(uploadInput.current)uploadInput.current.value="";}
  }
