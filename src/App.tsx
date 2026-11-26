@@ -57,7 +57,7 @@ export default function App(){
  async function fetchAllDistrictRows(table:string,columns:string,district:string){
   const data:any[]=[];let count:number|null=null;let offset=0;
   while(true){
-   const q=await (supabase as any).from(table).select(columns,{count:"exact"}).eq("district_id",district).range(offset,offset+999);
+   const q=await (supabase as any).from(table).select(columns,{count:"exact"}).eq("district_id",district).order("id",{ascending:true}).range(offset,offset+999);
    if(q.error)return {data,count,error:q.error};
    data.push(...(q.data||[]));count=q.count??count;
    if((q.data||[]).length<1000)break;
