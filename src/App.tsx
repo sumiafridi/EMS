@@ -17,8 +17,10 @@ export default function App(){
  const [uploadRows,setUploadRows]=useState<Record<string,any[]>>({});
  const [uploadFileName,setUploadFileName]=useState("");
  const [uploadWarnings,setUploadWarnings]=useState<string[]>([]);
- const [uploadRecords,setUploadRecords]=useState<any[]>([]);\n const [settingsDraft,setSettingsDraft]=useState<Record<string,string>>({});
- const [ruleEdits,setRuleEdits]=useState<Record<string,any>>({});\n const [trainingDraft,setTrainingDraft]=useState<Record<string,string>>({});
+ const [uploadRecords,setUploadRecords]=useState<any[]>([]);
+ const [settingsDraft,setSettingsDraft]=useState<Record<string,string>>({});
+ const [ruleEdits,setRuleEdits]=useState<Record<string,any>>({});
+ const [trainingDraft,setTrainingDraft]=useState<Record<string,string>>({});
  const [problemFilter,setProblemFilter]=useState("");
  const [newDistrictName,setNewDistrictName]=useState("");
  const [newDistrictCode,setNewDistrictCode]=useState("");
