@@ -158,6 +158,7 @@ export default function App(){
    const tehsilResult=kind==="Staff Data"?await supabase.from("election_tehsils").select("id,name").eq("district_id",districtId):{data:[],error:null};
    if(tehsilResult.error)throw tehsilResult.error;
    const tehsilMap=new Map<string,string>((tehsilResult.data||[]).map((t:any):[string,string]=>[norm(t.name),t.id]));
+   const invalidRows=raw.filter((r:any)=>kind==="Demand Rules"?!String(pick(r,"Duty Role","Role")).trim():kind==="Training Plans"?!String(pick(r,"Plan Type","plan_type")).trim():kind==="District Settings"?!String(pick(r,"Setting Key","Key","setting_key")).trim():kind==="Training Settings"?!String(pick(r,"Training Setting Key","Setting Key","Key","setting_key")).trim():false);
    const prepared=raw.map((r:any,index:number)=>{
     const key=identity(kind,r),old=existingMap.get(key);
     if(kind==="Staff Data")return { ...(old?.id?{id:old.id}:{}),district_id:districtId,tehsil_id:tehsilMap.get(norm(r.Tehsil))||null,source_staff_id:String(pick(r,"S.No","S No")||"").trim()||null,name:String(pick(r,"Name of Officer/Official","Name")||"").trim()||null,gender:String(pick(r,"Gender")||"").trim()||null,cnic:String(pick(r,"CNIC #","CNIC")||"").trim()||null,mobile:String(pick(r,"Mobile #","Mobile")||"").trim()||null,department:String(pick(r,"Department")||"").trim()||null,designation:String(pick(r,"Designation")||"").trim()||null,bps_text:String(pick(r,"BPS")??"").trim()||null,availability:String(pick(r,"Availability (Y/N)","Availability")||"").trim()||null,source_data:r};
@@ -178,7 +179,7 @@ export default function App(){
    const refreshed=await (supabase as any).from(cfg.table).select("*").eq("district_id",districtId).limit(500);
    setUploadRecords(refreshed.data||[]);
    setNotice(kind+" import completed: "+sent.toLocaleString()+" rows saved; "+invalid+" rows could not be mapped to mandatory database fields and remain visible in the preview. Source rows are retained in source_data.");
-   setUploadRows(prev=>({...prev,[kind]:[]}));setUploadWarnings(invalid?[invalid+" rows were not imported because mandatory mapping fields were missing."]:[]);
+   setUploadRows(prev=>({...prev,[kind]:invalidRows}));setUploadWarnings(invalid?[...uploadWarnings,invalid+" rows were not imported because mandatory database keys are missing. Those source rows remain in the preview so you can correct and re-upload them."]:[]);
   }catch(e){setNotice(kind+" import failed: "+(e instanceof Error?e.message:String(e))+". Rows committed in earlier batches remain saved; re-upload is safe because matching source identities are updated.");}
   finally{setBusy(false);}
  }
