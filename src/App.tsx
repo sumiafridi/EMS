@@ -1074,14 +1074,74 @@ export default function App(){
  const filteredReportRows=reportRows.filter((r:any)=>{const q=reportSearch.trim().toLowerCase();const t=reportTehsil.trim().toLowerCase();const values=Object.values(r).join(" ").toLowerCase();return (!q||values.includes(q))&&(!t||String(r.Tehsil||"").toLowerCase()===t);});
  const showDemand=rows.length?demand:0;
  const lgeNavigation=[
-  {title:"Dashboard",description:"District-wide operational overview",pages:["Overview"]},
-  {title:"Polling Stations & Boundaries",description:"DATA, tehsils, councils, census blocks, stations and block transfers",pages:["DATA Import","Tehsils Register","Councils (NC/VC)","Census Blocks (unique)","Polling Stations","Relations Check"]},
-  {title:"Ballot Papers & Election Forms",description:"Form-III, ballot proformas, packing data, invoices and tehsil exports",pages:["Form-III (Council)","Form-III Per Station","Proforma-A (Mayor/Chairman Ballot)","Proforma-B (5 Categories Ballot)","Packing-Data","Packing-Invoice (Form-XIII)","Tehsil Export (Electoral Area Detail)"]},
-  {title:"Staff Registers & Resources",description:"Employee roster, trainers and training venues",pages:["Staff Data","Staff Stations Feed","Master Trainers","Training Venues"]},
-  {title:"Election Duty & Deployment",description:"Demand, assignments, official forms, reserves and vacancy analysis",pages:["Staff Demand","Duty Assignments","Staff Assignment Format","Form-I — List of Polling Staff","Form-II — Appointment Orders","Reserve Staff","Vacant Posts","Vacant Stations","Cross-Tehsil Assignments","Staffing Gap Analysis","Tehsil Duty Summary"]},
-  {title:"Training Management",description:"Training plans, batches, attendance, pairings and shortage reports",pages:["Training Dashboard","Training Plan - Pres & Sr APO","Training Plan - APO & PO","Pairs - Pres & Sr APO","Pairs - APO & PO","Batches of PROs & Sr.APOs (Male)","Batches of PROs & Sr.APOs (Female)","Batches of APOs & POs (Male)","Batches of APOs & POs (Female)","Training Batches","Training Attendance","Training Shortage Report","Batches Detail Summary"]},
-  {title:"District Summaries & Registers",description:"Tehsil-wise and council-wise source data and operational summaries",pages:["Tehsil Summary","Tehsils Register","Councils (NC/VC)","Census Blocks (unique)","Tehsil Export (Electoral Area Detail)"]},
-  {title:"Administration & Data Quality",description:"District settings, uploads, templates and validation",pages:["Settings & Rules","Upload New District","Download Templates","Checks (validation)","Problems list","About / Guide"]}
+  {title:"Settings & Data",pages:[
+   {label:"Master Dashboard",section:"Overview"},
+   {label:"Settings & Rules",section:"Settings & Rules"},
+   {label:"Upload New District",section:"Upload New District"},
+   {label:"Download Templates",section:"Download Templates"},
+   {label:"About / Guide",section:"About / Guide"},
+   {label:"Checks (validation)",section:"Checks (validation)"},
+   {label:"Problems list",section:"Problems list"}
+  ]},
+  {title:"Block & Electoral Area Registers",pages:[
+   {label:"DATA (Census Blocks)",section:"DATA Import"},
+   {label:"Tehsils",section:"Tehsils Register"},
+   {label:"Councils (NC/VC)",section:"Councils (NC/VC)"},
+   {label:"Blocks (unique)",section:"Census Blocks (unique)"},
+   {label:"Staff Stations",section:"Staff Stations Feed"},
+   {label:"Tehsil Summary",section:"Tehsil Summary"}
+  ]},
+  {title:"Polling Stations & Electoral Forms",pages:[
+   {label:"Stations",section:"Polling Stations"},
+   {label:"Form-III (Council)",section:"Form-III (Council)"},
+   {label:"Form-III Per Station",section:"Form-III Per Station"}
+  ]},
+  {title:"Training, Trainers & Venues",pages:[
+   {label:"Master Trainers",section:"Master Trainers"},
+   {label:"Training Venues",section:"Training Venues"},
+   {label:"Staff Training Register",section:"Staff Data"},
+   {label:"Training Batches",section:"Training Batches"},
+   {label:"Training Attendance",section:"Training Attendance"},
+   {label:"Training Dashboard",section:"Training Dashboard"},
+   {label:"Training Shortage Report",section:"Training Shortage Report"},
+   {label:"Batches Detail Summary",section:"Batches Detail Summary"},
+   {label:"Training Plan - Pres & Sr APO",section:"Training Plan - Pres & Sr APO"},
+   {label:"Training Plan - APO & PO",section:"Training Plan - APO & PO"},
+   {label:"Pairs - Pres & Sr APO",section:"Pairs - Pres & Sr APO"},
+   {label:"Pairs - APO & PO",section:"Pairs - APO & PO"},
+   {label:"Batches PROs/SR.APOs (M)",section:"Batches of PROs & Sr.APOs (Male)"},
+   {label:"Batches PROs/SR.APOs (F)",section:"Batches of PROs & Sr.APOs (Female)"},
+   {label:"Batches APOs/POs (M)",section:"Batches of APOs & POs (Male)"},
+   {label:"Batches APOs/POs (F)",section:"Batches of APOs & POs (Female)"}
+  ]},
+  {title:"Ballot Papers, Proformas & Packing",pages:[
+   {label:"Proforma-A (Mayor/Chairman)",section:"Proforma-A (Mayor/Chairman Ballot)"},
+   {label:"Proforma-B (5 Categories)",section:"Proforma-B (5 Categories Ballot)"},
+   {label:"Packing-Data",section:"Packing-Data"},
+   {label:"Packing-Invoice",section:"Packing-Invoice (Form-XIII)"},
+   {label:"Tehsil Export",section:"Tehsil Export (Electoral Area Detail)"}
+  ]},
+  {title:"Duties, Staffing & Deployment",pages:[
+   {label:"Staff Data",section:"Staff Data"},
+   {label:"Staffing Demand",section:"Staff Demand"},
+   {label:"Auto Assignments",section:"Duty Assignments"},
+   {label:"Manual Duty Adjustment",section:"Duty Assignments"},
+   {label:"Form-I — List of Polling Staff",section:"Form-I — List of Polling Staff"},
+   {label:"Form-II — Appointment Orders",section:"Form-II — Appointment Orders"},
+   {label:"Emergency / Reserve Staff",section:"Reserve Staff"},
+   {label:"Unassigned Staff",section:"Vacant Posts"},
+   {label:"Staff Assignment Format",section:"Staff Assignment Format"},
+   {label:"Staffing Gap Analysis",section:"Staffing Gap Analysis"},
+   {label:"Vacant Posts",section:"Vacant Posts"},
+   {label:"Vacant Stations",section:"Vacant Stations"},
+   {label:"Cross-Tehsil Flow",section:"Cross-Tehsil Flow"},
+   {label:"Cross-Tehsil Assignments",section:"Cross-Tehsil Assignments"},
+   {label:"Tehsil Duty Summary",section:"Tehsil Duty Summary"}
+  ]},
+  {title:"Backup & Other Tools",pages:[
+   {label:"Backup & Restore",section:"Export All"},
+   {label:"Export All",section:"Export All"}
+  ]}
  ];
  if(!session)return <div className="auth-screen"><div className="auth-card"><div className="brand-mark">E</div><h1>KPK Election EMS</h1><p>Secure district access · Supabase cloud database</p><label>Email address<input value={email} onChange={e=>setEmail(e.target.value)} type="email" placeholder="Your authorized account email"/></label><button className="btn primary" disabled={busy} onClick={sendLogin}>{busy?"Sending…":"Send secure sign-in link"}</button><small>Only authorized EMS accounts can access district records.</small><div className="notice">{notice}</div></div></div>;
  return <div className="app"><aside className="sidebar"><div className="brand"><div className="brand-mark">E</div><div><b>KPK Election</b><small>Management System</small></div></div><div className="district-label">ELECTION WORKSPACE</div><div style={{padding:"0 12px 10px"}}><div style={{background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.16)",borderRadius:9,padding:"10px 12px",color:"#fff",fontSize:13,fontWeight:700}}>Local Government Election (LGE)</div><div style={{fontSize:10,opacity:.65,color:"#fff",padding:"6px 2px 0"}}>General Election will be a separate workspace</div></div><div className="district-label">ACTIVE DISTRICT</div><select className="district-select" value={districtId} onChange={e=>setDistrictId(e.target.value)}>{districts.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}</select><nav>{lgeNavigation.map(group=><div className="nav-group" key={group.title} style={{marginBottom:12}}><div className="nav-group-title" style={{fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:".07em",padding:"10px 14px 3px",opacity:.78}}>{group.title}</div><div style={{fontSize:10,lineHeight:1.35,padding:"0 14px 5px",opacity:.52}}>{group.description}</div>{group.pages.map(page=><button key={page} className={section===page?"nav active":"nav"} onClick={()=>setSection(page)}>{page}</button>)}</div>)}</nav><div className="side-foot"><span className="dot"></span> Supabase connected<small>{session.user.email}</small><button className="signout" onClick={()=>supabase.auth.signOut()}>Sign out</button></div></aside>
