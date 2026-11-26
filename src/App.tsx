@@ -63,6 +63,34 @@ export default function App(){
  useEffect(()=>{supabase.auth.getSession().then(({data})=>setSession(data.session));const {data:{subscription}}=supabase.auth.onAuthStateChange((_e,s)=>setSession(s));return()=>subscription.unsubscribe();},[]);
  useEffect(()=>{if(session)loadDistricts();},[session]);
  useEffect(()=>{if(session&&districtId)loadDistrictData();},[session,districtId]);
+ // Keep every open page on the same current district snapshot. Imports and edits
+ // made from another page/session are coalesced into one full relational refresh.
+ useEffect(()=>{
+  if(!session||!districtId)return;
+  const tables=[
+   "election_tehsils","election_councils","polling_stations","census_blocks",
+   "block_station_allocations","polling_booths","election_staff","master_trainers",
+   "training_venues","training_rooms","district_settings","demand_rules",
+   "training_plans","training_batches","training_participants","training_attendance",
+   "staff_assignments","reserve_staff","data_imports","import_issues","district_app_state"
+  ];
+  let refreshTimer:ReturnType<typeof setTimeout>|null=null;
+  const scheduleRefresh=()=>{
+   if(refreshTimer)clearTimeout(refreshTimer);
+   refreshTimer=setTimeout(()=>{refreshTimer=null;void loadDistrictData();},350);
+  };
+  let channel=supabase.channel("district-live-"+districtId);
+  for(const table of tables){
+   channel=channel.on("postgres_changes",{
+    event:"*",schema:"public",table,filter:"district_id=eq."+districtId
+   },scheduleRefresh);
+  }
+  channel.subscribe();
+  return ()=>{
+   if(refreshTimer)clearTimeout(refreshTimer);
+   void supabase.removeChannel(channel);
+  };
+ },[session,districtId]);
  useEffect(()=>{if(session&&districtId&&uploadConfig[section]){(async()=>{const q=await fetchAllDistrictRows(uploadConfig[section].table,"*",districtId);if(!q.error)setUploadRecords(q.data||[]);})();}},[session,districtId,section]);
  async function loadDistricts(){const {data,error}=await supabase.from("districts").select("id,name,code").eq("is_active",true).order("name");if(error){setNotice("District access error: "+error.message);return;}setDistricts(data||[]);if(!districtId&&data?.length)setDistrictId(data.find(d=>d.name==="Kohat")?.id||data[0].id);}
  async function beginImportAudit(importType:string,filename:string,rowCount:number){
