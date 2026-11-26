@@ -15,7 +15,10 @@ export default function App(){
  const input=useRef<HTMLInputElement>(null);
  const activeDistrict=districts.find(d=>d.id===districtId);
  const calculated=useMemo(()=>calculateDemand(stations.map((s,i):Station=>{const d=s.source_data||{};const tn=Number(s.tehsil_ps_number)||i+1;const cn=Number(s.nc_vc_ps_number||s.ps_number)||i+1;return {sNo:i+1,district:String(d.District??""),tehsil:String(d.Tehsil??""),councilType:String(d["Council Type (NC / VC)"]??""),councilNo:String(d["Council No"]??""),councilName:String(d["Council Name"]??""),psNo:String(s.nc_vc_ps_number||s.ps_number||""),sourceTehsilPsNo:String(d["Tehsil PS No"]??""),sourceNcVcPsNo:String(d["NC/VC PS No"]??""),stationName:s.name,psType:s.station_type||String(d["PS Type (Male / Female / Combined)"]??""),boothsMale:Number(s.male_booths??0),boothsFemale:Number(s.female_booths??0),maleVoters:Number(s.male_voters??0),femaleVoters:Number(s.female_voters??0),blockCount:0,blocks:[],tehsilStationNo:tn,ncVcStationNo:cn,tehsilPollingStationNo:tn,ncVcPollingStationNo:cn};})),[stations]);
- const demand=calculated.reduce((n,s)=>n+s.totalDemand,0);\n const maleVoterTotal=stations.reduce((n,s)=>n+Number(s.male_voters||0),0);\n const femaleVoterTotal=stations.reduce((n,s)=>n+Number(s.female_voters||0),0);\n const totalVoterTotal=maleVoterTotal+femaleVoterTotal;
+ const demand=calculated.reduce((n,s)=>n+s.totalDemand,0);
+ const maleVoterTotal=stations.reduce((n,s)=>n+Number(s.male_voters||0),0);
+ const femaleVoterTotal=stations.reduce((n,s)=>n+Number(s.female_voters||0),0);
+ const totalVoterTotal=maleVoterTotal+femaleVoterTotal;
 
  useEffect(()=>{supabase.auth.getSession().then(({data})=>setSession(data.session));const {data:{subscription}}=supabase.auth.onAuthStateChange((_e,s)=>setSession(s));return()=>subscription.unsubscribe();},[]);
  useEffect(()=>{if(session)loadDistricts();},[session]);
