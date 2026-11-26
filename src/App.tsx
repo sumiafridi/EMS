@@ -440,7 +440,8 @@ export default function App(){
      if(!reason&&!["male","female"].includes(gender.toLowerCase()))reason="Gender must be Male or Female.";
      if(!reason&&cnic&&cnic.length!==13)reason="CNIC must contain 13 digits.";
      if(!reason&&tehsil&&!tehsilMap.has(norm(tehsil)))reason="Tehsil does not exist in the selected district.";
-     if(!reason){const src={...sourceRow,Tehsil:tehsil,BPS:bps};payload={district_id:districtId,tehsil_id:tehsilMap.get(norm(tehsil))||null,source_staff_id:String(pick(r,"S.No","S No","Serial No")||"").trim()||null,name:String(pick(r,"Name of Officer/Official","Name")||"").trim(),gender:gender||null,cnic:cnic||null,mobile:String(pick(r,"Mobile #","Mobile")||"").trim()||null,department:String(pick(r,"Department")||"").trim()||null,designation:String(pick(r,"Designation")||"").trim()||null,bps_text:bps||null,place_of_posting:String(pick(r,"Place of Posting")||"").trim()||null,qualification:String(pick(r,"Qualification")||"").trim()||null,date_of_retirement:String(pick(r,"Date of Retirement")||"").trim()||null,availability:String(pick(r,"Availability (Y/N)","Availability")||"Y").trim(),source_data:src};}
+     const availabilityRaw=String(pick(r,"Availability (Y/N)","Availability")||"Y").trim().toLowerCase();if(!reason&&!["y","n","yes","no","available","unavailable"].includes(availabilityRaw))reason="Availability must be Y/N or Yes/No.";
+     if(!reason){const src={...sourceRow,Tehsil:tehsil,BPS:bps};payload={district_id:districtId,tehsil_id:tehsilMap.get(norm(tehsil))||null,source_staff_id:String(pick(r,"S.No","S No","Serial No")||"").trim()||null,name:String(pick(r,"Name of Officer/Official","Name")||"").trim(),gender:gender||null,cnic:cnic||null,mobile:String(pick(r,"Mobile #","Mobile")||"").trim()||null,department:String(pick(r,"Department")||"").trim()||null,designation:String(pick(r,"Designation")||"").trim()||null,bps_text:bps||null,place_of_posting:String(pick(r,"Place of Posting")||"").trim()||null,qualification:String(pick(r,"Qualification")||"").trim()||null,date_of_retirement:String(pick(r,"Date of Retirement")||"").trim()||null,availability:["n","no","unavailable"].includes(availabilityRaw)?"N":"Y",source_data:src};}
     }else if(kind==="Master Trainers"){
      const genderRaw=String(pick(r,"Gender")||"").trim(),gender=genderRaw.toLowerCase()==="m"?"Male":genderRaw.toLowerCase()==="f"?"Female":genderRaw;if(!reason&&!["male","female"].includes(gender.toLowerCase()))reason="Gender must be Male or Female.";
      if(!reason){const cnic=String(pick(r,"CNIC","CNIC #","cnic")||"").replace(/\D/g,"");if(!reason&&cnic&&cnic.length!==13)reason="CNIC must contain exactly 13 digits.";const src={...sourceRow,"Master Trainer Name":String(pick(r,"Master Trainer Name","Name","name")||"").trim(),Gender:gender,gender:gender.toLowerCase(),cnic,mobile:String(pick(r,"Mobile Number","Mobile #","mobile")||"").trim()};if(!reason)payload={district_id:districtId,name:src["Master Trainer Name"],gender,cnic:src.cnic||null,mobile:src.mobile||null,designation:String(pick(r,"Designation")||"").trim()||null,department:String(pick(r,"Department")||"").trim()||null,bps_text:String(pick(r,"BPS")||"").trim()||null,source_data:src};}
@@ -473,7 +474,7 @@ export default function App(){
      if(!reason)payload={district_id:districtId,setting_key:(kind==="Training Settings"?"training:":"")+settingKey,setting_value:jsonValue(kind==="Training Settings"?pick(r,"Training Setting Value","Setting Value","Value","setting_value"):pick(r,"Setting Value","Value","setting_value"))??""};
     }
     if(reason||!payload){rowErrors.push("Excel row "+rowNo+": "+(reason||"Could not map this row."));return;}
-    if(key&&ambiguous.has(key)){rowErrors.push("Excel row "+(index+2)+": matching database identity is ambiguous; row was not overwritten.");return;}
+    if(key&&ambiguous.has(key)){rowErrors.push("Excel row "+rowNo+": matching database identity is ambiguous; row was not overwritten.");return;}
     const old=key?existingByKey.get(key):null;
     if(old?.id)payload.id=old.id;
     prepared.push(payload);
@@ -490,7 +491,7 @@ export default function App(){
 
  async function uploadBatchWithSplit(part:DataRow[],startRow:number):Promise<number>{
   const {data,error}=await supabase.rpc("import_district_data_rows",{p_district_id:districtId,p_rows:part});
-  if(!error){const result:any=data||{};if(Array.isArray(result.row_errors)&&result.row_errors.length)setIssues(prev=>[...prev,...result.row_errors.map((x:any)=>"DATA batch row "+x.batch_row+": "+x.reason)]);return Number(result.rows_processed??part.length);}
+  if(!error){const result:any=data||{};if(Array.isArray(result.row_errors)&&result.row_errors.length)setIssues(prev=>[...prev,...result.row_errors.map((x:any)=>"DATA Excel row "+(startRow+Number(x.batch_row||1)+1)+": "+x.reason)]);return Number(result.rows_processed??part.length);}
   const message=error.message||"Database import failed";
   const timedOut=/statement timeout|timeout|canceling statement/i.test(message);
   if(timedOut&&part.length>1){
