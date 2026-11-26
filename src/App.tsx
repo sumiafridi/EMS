@@ -661,9 +661,9 @@ export default function App(){
    if(!parsed.length)throw new Error("No DATA rows found in worksheet "+selectedSheet+".");
    const sourceDistricts=[...new Set(parsed.map((r:any)=>String(r.District||"").trim()).filter(Boolean))];if(sourceDistricts.length>1)throw new Error("This DATA workbook contains multiple districts ("+sourceDistricts.join(", ")+"). Upload one district at a time.");if(sourceDistricts.length===1&&norm(sourceDistricts[0])!==norm(activeDistrict?.name))throw new Error("The workbook belongs to "+sourceDistricts[0]+", but the selected district is "+(activeDistrict?.name||"unknown")+". Select the matching district before importing.");
    const errors:string[]=[],valid:DataRow[]=[],seenAllocations=new Set<string>(),stationMeta=new Map<string,string>(),blockSegments=new Map<string,Map<string,string>>(),existingBlockSegments=new Map<string,Set<string>>();
+   const normValue=(v:any)=>String(v??"").trim().toLowerCase();
    const blockCodeById=new Map(blockRecords.map((x:any)=>[x.id,normValue(x.block_code||x.source_data?.["Census Block Code"])]));
    allocationRecords.forEach((a:any)=>{const code=blockCodeById.get(a.block_id),block=blockRecords.find((x:any)=>x.id===a.block_id),tehsil=normValue(block?.source_data?.Tehsil);if(code){const key=tehsil+"|"+code;if(!existingBlockSegments.has(key))existingBlockSegments.set(key,new Set());existingBlockSegments.get(key)!.add(String(a.gender_group||"Combined"));}});
-   const normValue=(v:any)=>String(v??"").trim().toLowerCase();
    parsed.forEach((r:any,i:number)=>{
     const rowNo=Number(r.__excel_row)||headerRow+i+1,issuesForRow:string[]=[];
     const districtName=String(r.District||"").trim(),tehsil=String(r.Tehsil||"").trim(),cType=String(r["Council Type (NC / VC)"]||"").trim().toUpperCase(),cNo=String(r["Council No"]||"").trim(),cName=String(r["Council Name"]||"").trim(),psNo=String(r["PS No"]||"").trim(),psName=String(r["No & Name of Polling Station"]||"").trim(),psTypeRaw=String(r["PS Type (Male / Female / Combined)"]||"").trim(),psType=psTypeRaw.toLowerCase()==="male"?"Male":psTypeRaw.toLowerCase()==="female"?"Female":psTypeRaw.toLowerCase()==="combined"?"Combined":psTypeRaw;
