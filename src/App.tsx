@@ -519,7 +519,7 @@ export default function App(){
 
  async function uploadBatchWithSplit(part:DataRow[],startRow:number,importId?:string):Promise<number>{
   const cleanPart=part.map((r:any)=>Object.fromEntries(Object.entries(r).filter(([k]:[string,any])=>k!=="__excel_row")));const {data,error}=await supabase.rpc("import_district_data_rows",{p_district_id:districtId,p_rows:cleanPart});
-  if(!error){const result:any=data||{};if(Array.isArray(result.row_errors)&&result.row_errors.length){const messages=result.row_errors.map((x:any)=>"Excel row "+(Number(part[Number(x.batch_row||1)-1]?.__excel_row)||startRow+Number(x.batch_row||1)+1)+": "+x.reason);setIssues(prev=>[...prev,...messages.map(x=>"DATA "+x)]);if(importId)await persistImportIssues(importId,"DATA",messages,part);}return Number(result.rows_processed??part.length);}
+  if(!error){const result:any=data||{};if(Array.isArray(result.row_errors)&&result.row_errors.length){const messages=result.row_errors.map((x:any)=>"Excel row "+(Number(part[Number(x.batch_row||1)-1]?.__excel_row)||startRow+Number(x.batch_row||1)+1)+": "+x.reason);setIssues(prev=>[...prev,...messages.map((x:string)=>"DATA "+x)]);if(importId)await persistImportIssues(importId,"DATA",messages,part);}return Number(result.rows_processed??part.length);}
   const message=error.message||"Database import failed";
   const timedOut=/statement timeout|timeout|canceling statement/i.test(message);
   if(timedOut&&part.length>1){
