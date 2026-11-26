@@ -62,17 +62,17 @@ export default function App(){
    supabase.from("polling_stations").select("id,tehsil_id,ps_number,nc_vc_ps_number,tehsil_ps_number,name,station_type,male_booths,female_booths,male_voters,female_voters,source_data",{count:"exact"}).eq("district_id",districtId).limit(2000),
    supabase.from("census_blocks").select("id,source_data",{count:"exact"}).eq("district_id",districtId).limit(5000),
    supabase.from("block_station_allocations").select("id,block_id",{count:"exact"}).eq("district_id",districtId).limit(5000),
-   supabase.from("election_staff").select("*",{count:"exact"}).eq("district_id",districtId).limit(10000),
-   supabase.from("master_trainers").select("*",{count:"exact"}).eq("district_id",districtId).limit(1000),
-   supabase.from("training_venues").select("*",{count:"exact"}).eq("district_id",districtId).limit(1000),
-   supabase.from("demand_rules").select("*",{count:"exact"}).eq("district_id",districtId).limit(1000),
-   supabase.from("training_plans").select("*",{count:"exact"}).eq("district_id",districtId).limit(100),
-   supabase.from("district_settings").select("*",{count:"exact"}).eq("district_id",districtId).limit(1000),
-   supabase.from("staff_assignments").select("*",{count:"exact"}).eq("district_id",districtId).limit(10000),
-   supabase.from("reserve_staff").select("*",{count:"exact"}).eq("district_id",districtId).limit(10000),
-   supabase.from("training_batches").select("*",{count:"exact"}).eq("district_id",districtId).limit(5000),
-   supabase.from("training_participants").select("*",{count:"exact"}).eq("district_id",districtId).limit(10000),
-   supabase.from("training_attendance").select("*",{count:"exact"}).eq("district_id",districtId).limit(10000)
+   supabase.from("election_staff").select("id,tehsil_id,name,gender,cnic,mobile,department,designation,bps_text,availability,source_data",{count:"exact"}).eq("district_id",districtId).limit(10000),
+   supabase.from("master_trainers").select("id,name,gender,cnic,mobile,source_data",{count:"exact"}).eq("district_id",districtId).limit(1000),
+   supabase.from("training_venues").select("id,name,address,capacity,source_data",{count:"exact"}).eq("district_id",districtId).limit(1000),
+   supabase.from("demand_rules").select("id,role,station_type,gender,basis,per_unit,adjustment,is_active,rule_data",{count:"exact"}).eq("district_id",districtId).limit(1000),
+   supabase.from("training_plans").select("id,plan_type,name,start_date,end_date,duration_days,batch_capacity,plan_data",{count:"exact"}).eq("district_id",districtId).limit(100),
+   supabase.from("district_settings").select("id,setting_key,setting_value",{count:"exact"}).eq("district_id",districtId).limit(1000),
+   supabase.from("staff_assignments").select("id,staff_id,station_id,role,assignment_status,assignment_data",{count:"exact"}).eq("district_id",districtId).limit(10000),
+   supabase.from("reserve_staff").select("id,staff_id,reserve_role,reserve_status,reserve_data",{count:"exact"}).eq("district_id",districtId).limit(10000),
+   supabase.from("training_batches").select("id,plan_id,batch_number,training_date,start_time,end_time,gender_group,role_group,venue_id,room_id,capacity,batch_data",{count:"exact"}).eq("district_id",districtId).limit(5000),
+   supabase.from("training_participants").select("id,plan_id,batch_id,staff_id,status,participant_data",{count:"exact"}).eq("district_id",districtId).limit(10000),
+   supabase.from("training_attendance").select("id,participant_id,attendance_date,status,remarks",{count:"exact"}).eq("district_id",districtId).limit(10000)
   ]);
   const err=[t.error,c.error,s.error,b.error,a.error,staffCount.error,trainerCount.error,venueCount.error,ruleCount.error,planCount.error,settingsCount.error,assignmentCount.error,reserveCount.error,batchCount.error,participantCount.error,attendanceCount.error].find(Boolean);if(err){setNotice("Could not load district data: "+err.message);return;}
   setStations((s.data||[]) as StationRow[]);
