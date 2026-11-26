@@ -24,6 +24,7 @@ declare v_key text;
 begin
   v_key := case when TG_OP='DELETE' then old.setting_key else new.setting_key end;
   if not public.is_global_admin() then
+    if TG_OP='INSERT' and coalesce(new.is_locked,false) then raise exception 'Only the Super Admin can lock district settings.'; end if;
     if TG_OP='DELETE' and (coalesce(old.is_locked,false) or exists (
       select 1 from public.global_election_settings g where g.setting_key=v_key and g.is_locked
     )) then raise exception 'This setting is locked by the Super Admin.'; end if;
@@ -46,6 +47,7 @@ returns trigger language plpgsql security definer set search_path=public
 as $$
 begin
   if not public.is_global_admin() then
+    if TG_OP='INSERT' and coalesce(new.is_locked,false) then raise exception 'Only the Super Admin can lock demand rules.'; end if;
     if TG_OP='DELETE' and coalesce(old.is_locked,false) then raise exception 'This demand rule is locked by the Super Admin.'; end if;
     if TG_OP='UPDATE' and (coalesce(old.is_locked,false) or coalesce(new.is_locked,false)) then raise exception 'This demand rule is locked by the Super Admin.'; end if;
   end if;
@@ -53,7 +55,7 @@ begin
   return new;
 end $$;
 drop trigger if exists demand_rules_lock_guard on public.demand_rules;
-create trigger demand_rules_lock_guard before update or delete
+create trigger demand_rules_lock_guard before insert or update or delete
 on public.demand_rules for each row execute function public.guard_demand_rule_lock();
 
 drop policy if exists global_settings_read_authenticated on public.global_election_settings;
