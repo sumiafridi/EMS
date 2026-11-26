@@ -653,7 +653,7 @@ export default function App(){
    if(!parsed.length)throw new Error("No DATA rows found in any worksheet.");
    const headers=Object.keys(parsed[0]),missing=required.filter(x=>!headers.includes(x));if(missing.length)throw new Error("The selected worksheet '"+selectedSheet+"' is missing key headings: "+missing.join(", ")+". Download the official DATA template and map these columns.");
    const sourceDistricts=[...new Set(parsed.map((r:any)=>String(r.District||"").trim()).filter(Boolean))];if(sourceDistricts.length>1)throw new Error("This DATA workbook contains multiple districts ("+sourceDistricts.join(", ")+"). Upload one district at a time.");if(sourceDistricts.length===1&&norm(sourceDistricts[0])!==norm(activeDistrict?.name))throw new Error("The workbook belongs to "+sourceDistricts[0]+", but the selected district is "+(activeDistrict?.name||"unknown")+". Select the matching district before importing.");
-   const errors:string[]=[],valid:DataRow[]=[],seenAllocations=new Set<string>(),stationMeta=new Map<string,string>(),blockSegments=new Map<string,{segment:string;stationKey:string}>(),existingBlockSegments=new Map<string,Set<string>>();
+   const errors:string[]=[],valid:DataRow[]=[],seenAllocations=new Set<string>(),stationMeta=new Map<string,string>(),blockSegments=new Map<string,Map<string,string>>(),existingBlockSegments=new Map<string,Set<string>>();
    const blockCodeById=new Map(blockRecords.map((x:any)=>[x.id,normValue(x.block_code||x.source_data?.["Census Block Code"])]));
    allocationRecords.forEach((a:any)=>{const code=blockCodeById.get(a.block_id),block=blockRecords.find((x:any)=>x.id===a.block_id),tehsil=normValue(block?.source_data?.Tehsil);if(code){const key=tehsil+"|"+code;if(!existingBlockSegments.has(key))existingBlockSegments.set(key,new Set());existingBlockSegments.get(key)!.add(String(a.gender_group||"Combined"));}});
    const normValue=(v:any)=>String(v??"").trim().toLowerCase();
@@ -666,10 +666,10 @@ export default function App(){
     const stationKey=[normValue(tehsil),cType,normValue(cNo),normValue(psNo)].join("|"),stationDesc=[psName,psType].join("|");
     if(stationKey&&stationMeta.has(stationKey)&&stationMeta.get(stationKey)!==stationDesc)issuesForRow.push("The same station number has conflicting name/type values in this workbook");
     else if(stationKey)stationMeta.set(stationKey,stationDesc);
-    const allocationKey=stationKey+"|"+normValue(block),blockKey=normValue(tehsil)+"|"+normValue(block),previousSegment=blockSegments.get(blockKey);
+    const allocationKey=stationKey+"|"+normValue(block),blockKey=normValue(tehsil)+"|"+normValue(block),previousSegments=blockSegments.get(blockKey)||new Map<string,string>();
     const existingSegments=existingBlockSegments.get(blockKey)||new Set<string>();if((psType==="Combined"&&[...existingSegments].some(x=>x!=="Combined"))||(psType!=="Combined"&&existingSegments.has("Combined")))issuesForRow.push("This census block already has an incompatible Combined allocation in the database. Remove or split the old allocation before importing.");
-    if(previousSegment&&(psType==="Combined"||previousSegment.segment==="Combined"||(previousSegment.segment===psType&&previousSegment.stationKey!==stationKey)))issuesForRow.push("This census block conflicts with another allocation: allow one Male and one Female segment, but Combined cannot coexist with either and the same gender cannot be assigned to two stations.");
-    if(!previousSegment&&blockKey)blockSegments.set(blockKey,{segment:psType,stationKey});
+    if((psType==="Combined"&&previousSegments.size>0)||(previousSegments.has("Combined")&&psType!=="Combined")||(previousSegments.has(psType)&&previousSegments.get(psType)!==stationKey))issuesForRow.push("This census block conflicts with another allocation: allow one Male and one Female segment, but Combined cannot coexist with either and the same gender cannot be assigned to two stations.");
+    if(!issuesForRow.length&&blockKey){if(!blockSegments.has(blockKey))blockSegments.set(blockKey,new Map<string,string>());blockSegments.get(blockKey)!.set(psType,stationKey);}
     if(allocationKey&&seenAllocations.has(allocationKey))issuesForRow.push("Duplicate block-to-station row in this workbook");
     if(allocationKey)seenAllocations.add(allocationKey);
     if(issuesForRow.length)errors.push("Excel row "+rowNo+": "+issuesForRow.join("; "));
