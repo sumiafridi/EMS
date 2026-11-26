@@ -1,4 +1,4 @@
-name: Domain tests
+name: EMS checks
 
 on:
   push:
@@ -7,11 +7,15 @@ on:
     branches: [main]
 
 jobs:
-  domain:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: package.json
+      - run: npm install
       - run: npm run test:domain
+      - run: npm run build
