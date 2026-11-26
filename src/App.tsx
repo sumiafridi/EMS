@@ -70,7 +70,7 @@ export default function App(){
   }
   async function persistImportIssues(importId:string,entity:string,messages:string[],sourceRows:any[]){
    const records=messages.map(message=>{
-    const match=message.match(/Excel row (\\d+):\\s*(.*)/i),rowNumber=match?Number(match[1]):null;
+    const match=message.match(/Excel row (\d+):\s*(.*)/i),rowNumber=match?Number(match[1]):null;
     const source=sourceRows.find((r:any)=>Number(r.__excel_row)===rowNumber)||(rowNumber?sourceRows[rowNumber-2]:null)||{};
     const sourceRow=Object.fromEntries(Object.entries(source).filter(([k])=>k!=="__excel_row"));
     return {district_id:districtId,import_id:importId,row_number:rowNumber,severity:"warning",entity,message:match?match[2]:message,source_row:sourceRow};
@@ -116,7 +116,7 @@ export default function App(){
    fetchAllDistrictRows("import_issues","id,import_id,row_number,severity,entity,message,source_row,created_at",districtId)
   ]);
   const err=[t.error,c.error,s.error,b.error,a.error,staffCount.error,trainerCount.error,venueCount.error,ruleCount.error,planCount.error,settingsCount.error,assignmentCount.error,reserveCount.error,batchCount.error,participantCount.error,attendanceCount.error,importsQ.error,issuesQ.error].find(Boolean);if(err){setNotice("Could not load district data: "+err.message);return;}
-  setImportHistory(importsQ.data||[]);setPersistentImportIssues(issuesQ.data||[]);
+  setImportHistory([...(importsQ.data||[])].sort((a:any,b:any)=>String(b.created_at||"").localeCompare(String(a.created_at||""))));setPersistentImportIssues(issuesQ.data||[]);
   setStations((s.data||[]) as StationRow[]);
   setRows((b.data||[]).map(x=>x.source_data as DataRow).filter(Boolean));setBlockRecords(b.data||[]);setAllocationRecords(a.data||[]);setAllocationTargets({});
   setCounts({tehsils:t.count||0,stations:s.count||0,blocks:b.count||0,allocations:a.count||0,allocatedBlocks:new Set((a.data||[]).map(x=>x.block_id)).size,linkedStations:new Set((a.data||[]).map(x=>x.station_id).filter(Boolean)).size});
