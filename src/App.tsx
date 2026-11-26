@@ -668,6 +668,7 @@ export default function App(){
   if(!presPlan||!apoPlan){setNotice("Both training programme definitions are required before batch generation.");return;}
   const normRole=(v:string)=>{const x=String(v||"").toLowerCase().replace(/[^a-z]/g,"");if(x==="presiding"||x==="presidingofficer"||x==="pro")return "Presiding Officer";if(x==="seniorapo"||x==="srapo")return "Senior APO";if(x==="apo")return "APO";if(x==="po"||x==="pollingofficer")return "PO";return String(v||"");};
   const staffById=new Map(staffRecords.map((x:any)=>[x.id,x]));
+  const trainedStaffIds=new Set(participantRecords.filter((p:any)=>attendanceRecords.some((a:any)=>a.participant_id===p.id&&["present","attended"].includes(String(a.status||"").toLowerCase()))).map((p:any)=>p.staff_id));
   const allPeople:any[]=[];
   active.forEach(a=>{const st=staffById.get(a.staff_id);if(st)allPeople.push({staff_id:a.staff_id,role:normRole(a.role),gender:String(st.gender||a.assignment_data?.gender||"").toLowerCase(),name:st.name||st.source_data?.["Name of Officer/Official"]||"" ,source:"Duty"});});
   reserveRecords.filter(r=>r.reserve_status==="Available").forEach(r=>{const st=staffById.get(r.staff_id);if(st)allPeople.push({staff_id:r.staff_id,role:normRole(r.reserve_role),gender:String(st.gender||r.reserve_data?.gender||"").toLowerCase(),name:st.name||st.source_data?.["Name of Officer/Official"]||"",source:"Reserve"});});
@@ -704,7 +705,7 @@ export default function App(){
     const venueCapacity=Math.min(...venues.map(v=>Number(v.capacity)||cap));
     const effectiveCap=Math.max(1,Math.min(cap,venueCapacity));
     const neededBatches=Math.ceil(requiredSeats/effectiveCap);
-    const people=allPeople.filter(p=>p.gender===g&&(isPres?["Presiding Officer","Senior APO"].includes(p.role):["APO","PO"].includes(p.role))&&!usedPeople.has(p.staff_id));
+    const people=allPeople.filter(p=>p.gender===g&&(isPres?["Presiding Officer","Senior APO"].includes(p.role):["APO","PO"].includes(p.role))&&!usedPeople.has(p.staff_id)&&!trainedStaffIds.has(p.staff_id));
     const ordered=people.slice(0,requiredSeats);
     let participantIndex=0;
     for(let bi=0;bi<neededBatches;bi++){
@@ -1068,13 +1069,14 @@ export default function App(){
   const knownTehsils=new Set(dashboard.tehsils.map((t:any)=>String(t.name||"").trim().toLowerCase()));
   const isStaffDutyEligible=(st:any)=>{
    if(!st)return false;
-   const name=val(st,"name","Name of Officer/Official"),gender=val(st,"gender","Gender").toLowerCase(),tehsil=val(st,"Tehsil","tehsil");
+   const name=val(st,"name","Name of Officer/Official"),gender=val(st,"gender","Gender").toLowerCase(),tehsil=val(st,"Tehsil","tehsil")||String(dashboard.tehsils.find((t:any)=>t.id===st.tehsil_id)?.name||"");
    const rawBps=val(st,"bps_text","BPS"),bps=rawBps!==""?Number(rawBps):NaN;
    const availability=val(st,"availability","Availability (Y/N)").toLowerCase();
    const cnic=val(st,"cnic","CNIC #").replace(/\\D/g,"");
    return !!name&&(gender==="male"||gender==="female")&&!!tehsil&&knownTehsils.has(tehsil.toLowerCase())&&Number.isInteger(bps)&&bps>=7&&["y","yes","available"].includes(availability)&&(!cnic||cnicCountsForEligibility.get(cnic)===1);
   };
   const activeAssignments=assignmentRecords.filter(a=>String(a.assignment_status||"Active").toLowerCase()==="active"&&isStaffDutyEligible(staffById.get(a.staff_id)));
+  const currentBatchRecords=batchRecords.filter(b=>String(b.batch_data?.generation_status||"Active").toLowerCase()!=="superseded");
   const roleName=(v:string)=>{const x=v.toLowerCase().replace(/\s+/g," ").trim();if(x==="po"||x==="polling officer")return "Polling Officer";if(x==="presiding"||x==="presiding officer"||x==="pro")return "Presiding Officer";if(x==="sr apo"||x==="senior apo")return "Senior APO";if(x==="nq"||x==="naib qasid")return "Naib Qasid";return v;};
   const assignedFor=(tehsil:string,role:string,gender:string)=>activeAssignments.filter(a=>{
    const st=staffById.get(a.staff_id),ps=stationById.get(a.station_id);
@@ -1107,12 +1109,12 @@ export default function App(){
   const present=attendanceRecords.filter(r=>["present","attended"].includes(String(r.status||"").toLowerCase())).length;
   const absent=attendanceRecords.filter(r=>String(r.status||"").toLowerCase()==="absent").length;
   const pending=attendanceRecords.filter(r=>["pending",""].includes(String(r.status||"").toLowerCase())).length;
-  const sundayBatches=batchRecords.filter(b=>b.training_date&&new Date(b.training_date+"T00:00:00").getDay()===0).length;
+  const sundayBatches=currentBatchRecords.filter(b=>b.training_date&&new Date(b.training_date+"T00:00:00").getDay()===0).length;
   let venueConflicts=0;
-  for(let i=0;i<batchRecords.length;i++)for(let j=i+1;j<batchRecords.length;j++){const a=batchRecords[i],b=batchRecords[j];if(!a.venue_id||a.venue_id!==b.venue_id||a.training_date!==b.training_date)continue;const as=String(a.start_time||"00:00"),ae=String(a.end_time||"23:59"),bs=String(b.start_time||"00:00"),be=String(b.end_time||"23:59");if(as<be&&bs<ae)venueConflicts++;}
+  for(let i=0;i<currentBatchRecords.length;i++)for(let j=i+1;j<currentBatchRecords.length;j++){const a=currentBatchRecords[i],b=currentBatchRecords[j];if(!a.venue_id||a.venue_id!==b.venue_id||a.training_date!==b.training_date)continue;const as=String(a.start_time||"00:00"),ae=String(a.end_time||"23:59"),bs=String(b.start_time||"00:00"),be=String(b.end_time||"23:59");if(as<be&&bs<ae)venueConflicts++;}
   const crossAssignments=activeAssignments.filter(a=>{const st=staffById.get(a.staff_id),ps=stationById.get(a.station_id);const home=val(st,"Tehsil"),work=val(ps,"Tehsil");return !!home&&!!work&&home.toLowerCase()!==work.toLowerCase();}).length;
   const reserveByRole=new Map<string,number>();reserveRecords.forEach(r=>{const k=String(r.reserve_role||"Unspecified");reserveByRole.set(k,(reserveByRole.get(k)||0)+1);});
-  const batchGroups=[{label:"Presiding / Senior APO",male:batchRecords.filter(b=>String(b.role_group||b.batch_data?.role_group||"").toLowerCase().includes("pres")&&String(b.gender_group||"").toLowerCase()==="male").length,female:batchRecords.filter(b=>String(b.role_group||b.batch_data?.role_group||"").toLowerCase().includes("pres")&&String(b.gender_group||"").toLowerCase()==="female").length},{label:"APO + PO",male:batchRecords.filter(b=>/apo|po/i.test(String(b.role_group||b.batch_data?.role_group||""))&&String(b.gender_group||"").toLowerCase()==="male").length,female:batchRecords.filter(b=>/apo|po/i.test(String(b.role_group||b.batch_data?.role_group||""))&&String(b.gender_group||"").toLowerCase()==="female").length}];
+  const batchGroups=[{label:"Presiding / Senior APO",male:currentBatchRecords.filter(b=>String(b.role_group||b.batch_data?.role_group||"").toLowerCase().includes("pres")&&String(b.gender_group||"").toLowerCase()==="male").length,female:currentBatchRecords.filter(b=>String(b.role_group||b.batch_data?.role_group||"").toLowerCase().includes("pres")&&String(b.gender_group||"").toLowerCase()==="female").length},{label:"APO + PO",male:currentBatchRecords.filter(b=>/apo|po/i.test(String(b.role_group||b.batch_data?.role_group||""))&&String(b.gender_group||"").toLowerCase()==="male").length,female:currentBatchRecords.filter(b=>/apo|po/i.test(String(b.role_group||b.batch_data?.role_group||""))&&String(b.gender_group||"").toLowerCase()==="female").length}];
   const roleKey=(v:string)=>{const k=v.toLowerCase().replace(/[^a-z]/g,"");if(k==="pro"||k==="presiding"||k==="presidingofficer")return "Presiding Officer";if(k==="srapo"||k==="seniorapo"||k==="seniorassistantpresidingofficer")return "Senior APO";if(k==="apo"||k==="assistantpresidingofficer")return "APO";if(k==="po"||k==="pollingofficer")return "PO";return v;};
   const reserveRows=reserveSummary.categories.map(c=>{const actual=reserveRecords.filter(r=>{const st=staffById.get(r.staff_id);return String(r.reserve_status||"Available").toLowerCase()==="available"&&roleKey(String(r.reserve_role||""))===c.role&&val(st,"Gender","gender").toLowerCase()===c.gender.toLowerCase();}).length;return {...c,actual,shortage:Math.max(0,c.reserve-actual)};});
   const ineligibleActiveAssignments=assignmentRecords.filter(a=>String(a.assignment_status||"Active").toLowerCase()==="active"&&!isStaffDutyEligible(staffById.get(a.staff_id))).length;
