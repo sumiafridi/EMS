@@ -435,13 +435,13 @@ export default function App(){
     if(key)seen.add(key);
     let payload:any=null;
     if(kind==="Staff Data"){
-     const gender=String(pick(r,"Gender")||"").trim(),cnic=String(pick(r,"CNIC #","CNIC")||"").replace(/\D/g,""),bps=String(pick(r,"BPS")??"").trim(),tehsil=String(pick(r,"Tehsil")||"").trim();
-     if(!reason&&gender&&!["male","female"].includes(gender.toLowerCase()))reason="Gender must be Male or Female.";
+     const genderRaw=String(pick(r,"Gender")||"").trim(),gender=genderRaw.toLowerCase()==="m"?"Male":genderRaw.toLowerCase()==="f"?"Female":genderRaw,cnic=String(pick(r,"CNIC #","CNIC")||"").replace(/\D/g,""),bps=String(pick(r,"BPS")??"").trim(),tehsil=String(pick(r,"Tehsil")||"").trim();
+     if(!reason&&!["male","female"].includes(gender.toLowerCase()))reason="Gender must be Male or Female.";
      if(!reason&&cnic&&cnic.length!==13)reason="CNIC must contain 13 digits.";
      if(!reason&&tehsil&&!tehsilMap.has(norm(tehsil)))reason="Tehsil does not exist in the selected district.";
      if(!reason){const src={...r,Tehsil:tehsil,BPS:bps};payload={district_id:districtId,tehsil_id:tehsilMap.get(norm(tehsil))||null,source_staff_id:String(pick(r,"S.No","S No","Serial No")||"").trim()||null,name:String(pick(r,"Name of Officer/Official","Name")||"").trim(),gender:gender||null,cnic:cnic||null,mobile:String(pick(r,"Mobile #","Mobile")||"").trim()||null,department:String(pick(r,"Department")||"").trim()||null,designation:String(pick(r,"Designation")||"").trim()||null,bps_text:bps||null,place_of_posting:String(pick(r,"Place of Posting")||"").trim()||null,qualification:String(pick(r,"Qualification")||"").trim()||null,date_of_retirement:String(pick(r,"Date of Retirement")||"").trim()||null,availability:String(pick(r,"Availability (Y/N)","Availability")||"Y").trim(),source_data:src};}
     }else if(kind==="Master Trainers"){
-     const gender=String(pick(r,"Gender")||"").trim();if(!reason&&!["male","female"].includes(gender.toLowerCase()))reason="Gender must be Male or Female.";
+     const genderRaw=String(pick(r,"Gender")||"").trim(),gender=genderRaw.toLowerCase()==="m"?"Male":genderRaw.toLowerCase()==="f"?"Female":genderRaw;if(!reason&&!["male","female"].includes(gender.toLowerCase()))reason="Gender must be Male or Female.";
      if(!reason){const src={...r,"Master Trainer Name":String(pick(r,"Master Trainer Name","Name","name")||"").trim(),Gender:gender,gender:gender.toLowerCase(),cnic:String(pick(r,"CNIC","CNIC #","cnic")||"").replace(/\D/g,""),mobile:String(pick(r,"Mobile Number","Mobile #","mobile")||"").trim()};payload={district_id:districtId,name:src["Master Trainer Name"],gender,cnic:src.cnic||null,mobile:src.mobile||null,designation:String(pick(r,"Designation")||"").trim()||null,department:String(pick(r,"Department")||"").trim()||null,bps_text:String(pick(r,"BPS")||"").trim()||null,source_data:src};}
     }else if(kind==="Training Venues"){
      const gender=String(pick(r,"Gender")||"").trim(),capacity=Number(String(pick(r,"Maximum Capacity","Capacity","capacity")??"").replace(/,/g,"")),name=String(pick(r,"Venue Name","venue_name","Name")||"").trim(),room=String(pick(r,"Classroom Name/No.","Classroom","classroom")||"").trim();
