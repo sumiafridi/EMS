@@ -253,3 +253,28 @@ body.ems-print-form3 #ems-form3-print .ems-form3-council>.ems-form3-heading>.ems
 .status-pending{background:#fff2d7;color:#875b08}
 .status-verified{background:#e3f5ed;color:#14734f}
 @media(max-width:850px){.main{width:calc(100% - 70px);max-width:none}.sidebar{overflow-y:auto}.sidebar nav{overflow-y:auto}}
+
+/* Definitive desktop/mobile layout overrides (the original sidebar nav is CSS grid) */
+.app{display:block;width:100%;min-height:100vh}
+.sidebar{width:252px!important;height:100vh!important;inset:0 auto 0 0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important}
+.sidebar nav{display:block!important;flex:1 1 auto!important;min-height:0!important;overflow-y:auto!important;overflow-x:hidden!important;gap:0!important;padding:0 2px 18px!important}
+.sidebar nav .nav-group{display:block!important}
+.sidebar nav .nav{display:block!important;width:100%!important}
+.sidebar .side-foot{flex:0 0 auto!important;margin-top:8px!important}
+.main{display:block!important;margin-left:252px!important;width:calc(100% - 252px)!important;max-width:none!important;min-width:0!important;padding:26px clamp(16px,2.2vw,38px)!important}
+.upload-workspace{display:block!important;width:100%!important;max-width:none!important;min-width:0!important;margin:18px 0!important}
+.upload-workspace>.panel-head{width:100%!important}
+.upload-workspace .records-heading{display:flex!important;width:100%!important;justify-content:space-between!important;align-items:center!important;flex-wrap:wrap!important}
+.upload-workspace .table-wrap{width:100%!important;max-width:100%!important;overflow:auto!important}
+.upload-workspace .table-wrap table{width:max-content!important;min-width:100%!important}
+.trainer-control-panel{display:block!important;width:100%!important;max-width:none!important;margin:16px 0 24px!important;padding:22px!important;border:2px solid #168578!important;background:#f7fffd!important}
+.trainer-control-panel .panel-head{display:flex!important;justify-content:space-between!important;align-items:flex-start!important}
+.trainer-control-panel h3{font-size:19px!important;color:#075e56!important}
+.trainer-control-panel .table-wrap{max-height:65vh!important;overflow:auto!important}
+.trainer-control-panel table{min-width:1050px!important;width:100%!important}
+.trainer-control-panel thead th{position:sticky!important;top:0!important;z-index:3!important}
+@media(max-width:850px){
+ .sidebar{width:70px!important}
+ .sidebar nav{display:block!important;overflow-y:auto!important}
+ .main{margin-left:70px!important;width:calc(100% - 70px)!important;padding:18px 12px!important}
+}
