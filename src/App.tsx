@@ -694,8 +694,7 @@ export default function App(){
  }
  async function generateTrainingBatches(){
   if(!districtId)return;
-  const active=operationalSummary.activeAssignments;
-  if(!active.length){setNotice("Generate and save duty assignments first. No active assigned staff are available for training.");setSection("Staff Demand");return;}
+  if(!staffRecords.length){setNotice("Import staff register data before generating training batches.");setSection("Staff Data");return;}
   const plansQ=await supabase.from("training_plans").select("*").eq("district_id",districtId);
   if(plansQ.error){setNotice(plansQ.error.message);return;}
   const plans=plansQ.data||[];
@@ -705,8 +704,11 @@ export default function App(){
   const staffById=new Map(staffRecords.map((x:any)=>[x.id,x]));
   const trainedStaffIds=new Set(participantRecords.filter((p:any)=>attendanceRecords.some((a:any)=>a.participant_id===p.id&&["present","attended"].includes(String(a.status||"").toLowerCase()))).map((p:any)=>p.staff_id));
   const allPeople:any[]=[];
-  active.forEach(a=>{const st=staffById.get(a.staff_id);if(st)allPeople.push({staff_id:a.staff_id,role:normRole(a.role),gender:String(st.gender||a.assignment_data?.gender||"").toLowerCase(),name:st.name||st.source_data?.["Name of Officer/Official"]||"" ,source:"Duty"});});
-  reserveRecords.filter(r=>r.reserve_status==="Available").forEach(r=>{const st=staffById.get(r.staff_id);if(st)allPeople.push({staff_id:r.staff_id,role:normRole(r.reserve_role),gender:String(st.gender||r.reserve_data?.gender||"").toLowerCase(),name:st.name||st.source_data?.["Name of Officer/Official"]||"",source:"Reserve"});});
+  const readStaff=(st:any,...keys:string[])=>{for(const k of keys){const v=st?.[k]??st?.source_data?.[k];if(v!==undefined&&v!==null&&String(v).trim()!=="")return String(v).trim();}return "";};
+  const duplicateCnic=new Map<string,number>();staffRecords.forEach((st:any)=>{const c=readStaff(st,"cnic","CNIC #").replace(/\D/g,"");if(c)duplicateCnic.set(c,(duplicateCnic.get(c)||0)+1);});
+  const eligibleTrainingStaff=staffRecords.filter((st:any)=>{const name=readStaff(st,"name","Name of Officer/Official"),g=readStaff(st,"gender","Gender").toLowerCase(),bps=Number(readStaff(st,"bps_text","BPS")),av=readStaff(st,"availability","Availability (Y/N)").toLowerCase(),c=readStaff(st,"cnic","CNIC #").replace(/\D/g,"");return !!name&&(g==="male"||g==="female")&&Number.isInteger(bps)&&bps>=7&&["y","yes","available"].includes(av)&&(!c||duplicateCnic.get(c)===1);});
+  const rolePool=(role:string,gender:string)=>eligibleTrainingStaff.filter((st:any)=>{const g=readStaff(st,"gender","Gender").toLowerCase(),bps=Number(readStaff(st,"bps_text","BPS"));return g===gender&&(role==="Presiding Officer"||role==="Senior APO"?bps>=16:bps>=7&&bps<=15);});
+  for(const gender of ["male","female"]){for(const role of ["Presiding Officer","Senior APO","APO","PO"]){const target=reserveSummary.categories.find((x:any)=>x.role===role&&x.gender.toLowerCase()===gender)?.training||0;const pool=rolePool(role,gender).filter((st:any)=>!trainedStaffIds.has(st.id)).sort((a:any,b:any)=>Number(readStaff(b,"bps_text","BPS"))-Number(readStaff(a,"bps_text","BPS")));for(const st of pool.slice(0,target)){allPeople.push({staff_id:st.id,role,gender,name:readStaff(st,"name","Name of Officer/Official"),source:"Staff Register"});}}}
   const usedPeople=new Set<string>();const batchesToSave:any[]=[],participantsToSave:any[]=[];
   const includeSunday=String(trainingDraft.include_sunday??"false").toLowerCase()==="true";
   const dateObj=(v:string)=>{const [y,m,d]=String(v).split("-").map(Number);return new Date(Date.UTC(y,m-1,d,12));};
@@ -765,7 +767,7 @@ export default function App(){
    }
   }
   if(!batchesToSave.length){setNotice("No training batches are required by the current demand calculation.");return;}
-  if(!confirm("Generate "+batchesToSave.length+" saved training batches and "+participantsToSave.length+" participants? Male and female groups will use separate classrooms and matched master trainers. Missing seats will be flagged, Sundays excluded unless enabled. Existing records will not be deleted."))return;
+  if(!confirm("Generate "+batchesToSave.length+" saved training batches and "+participantsToSave.length+" participants? Male and female groups will use separate classrooms and matched master trainers. Missing seats will be flagged, Sundays excluded unless enabled. Existing generated records remain available; staff and polling-station master data are not changed."))return;
   setBusy(true);setNotice("Saving training batches and participants…");
   try{
    const inserted:any[]=[];for(let i=0;i<batchesToSave.length;i+=100){const q=await supabase.from("training_batches").insert(batchesToSave.slice(i,i+100)).select("id,plan_id,batch_number");if(q.error)throw q.error;inserted.push(...(q.data||[]));setNotice("Saved "+inserted.length+" / "+batchesToSave.length+" batches…");}
