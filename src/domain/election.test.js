@@ -80,3 +80,16 @@ test("district demand rules override default staffing formulas", () => {
     [2, 1, 3, 2, 8, 0],
   );
 });
+
+test("a shared block feeds male voters to Male station and female voters to Female station only", () => {
+  const sharedBlock = "BLOCK-01";
+  const stations = buildStations([
+    row({ "PS No": "1", "No & Name of Polling Station": "Male Station", "PS Type (Male / Female / Combined)": "Male", "Census Block Code": sharedBlock, "Booths Male": 2, "Booths Female": 0, "Male Voters (block)": 120, "Female Voters (block)": 75 }),
+    row({ "PS No": "2", "No & Name of Polling Station": "Female Station", "PS Type (Male / Female / Combined)": "Female", "Census Block Code": sharedBlock, "Booths Male": 0, "Booths Female": 2, "Male Voters (block)": 120, "Female Voters (block)": 75 }),
+  ]);
+  assert.equal(stations.length, 2);
+  const male = stations.find(s => s.psType === "Male");
+  const female = stations.find(s => s.psType === "Female");
+  assert.deepEqual([male.maleVoters, male.femaleVoters], [120, 0]);
+  assert.deepEqual([female.maleVoters, female.femaleVoters], [0, 75]);
+});
