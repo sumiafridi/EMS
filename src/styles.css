@@ -232,3 +232,24 @@ body.ems-print-form3 #ems-form3-print .ems-form3-council>.ems-form3-heading>.ems
  display:block!important;white-space:pre-line!important;text-align:center!important;
  line-height:1.35!important;
 }
+
+/* EMS workspace layout: keep navigation and all data tables fully accessible */
+.sidebar{overflow-y:auto;overflow-x:hidden}
+.sidebar nav{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;align-content:start;padding:0 2px 18px;scrollbar-width:thin;scrollbar-color:#58738a transparent}
+.sidebar .side-foot{flex-shrink:0}
+.main{width:calc(100% - 252px);max-width:none;min-width:0;padding:26px clamp(16px,2.2vw,38px)}
+.main>header{width:100%;min-width:0}
+.panel,.upload-workspace{min-width:0;width:100%}
+.table-wrap{width:100%;max-width:100%;overflow-x:auto;overflow-y:visible}
+.table-wrap table{width:max-content;min-width:100%;white-space:nowrap}
+.table-wrap th,.table-wrap td{vertical-align:middle}
+.records-heading{gap:16px;flex-wrap:wrap}
+.records-heading .header-actions{flex-wrap:wrap}
+.trainer-control-panel{border:1px solid #b8d8d2;background:#fcfefd}
+.trainer-control-panel .panel-head{align-items:flex-start;gap:16px}
+.trainer-control-panel .table-wrap{max-height:62vh;overflow:auto}
+.trainer-control-panel thead th{position:sticky;top:0;z-index:2}
+.status-pending,.status-verified{display:inline-block;border-radius:14px;padding:5px 9px;font-size:10px;font-weight:700}
+.status-pending{background:#fff2d7;color:#875b08}
+.status-verified{background:#e3f5ed;color:#14734f}
+@media(max-width:850px){.main{width:calc(100% - 70px);max-width:none}.sidebar{overflow-y:auto}.sidebar nav{overflow-y:auto}}
