@@ -204,3 +204,25 @@
  body.ems-print-form3 .ems-form3-certificate{margin-top:20px;font-size:8pt}
  body.ems-print-form3 .ems-form3-signatures{margin-top:28px!important;font-size:8pt}
 }
+
+/* Hard override for Form-III: keep the complete heading centered in screen and print */
+#ems-form3-print .ems-form3-council>.ems-form3-heading,
+body.ems-print-form3 #ems-form3-print .ems-form3-council>.ems-form3-heading{
+  display:grid!important;grid-template-columns:1fr!important;justify-items:center!important;
+  align-items:center!important;justify-content:center!important;text-align:center!important;
+  width:100%!important;margin:0 auto 12px!important;padding:0!important;
+}
+#ems-form3-print .ems-form3-council>.ems-form3-heading>* ,
+body.ems-print-form3 #ems-form3-print .ems-form3-council>.ems-form3-heading>*{
+  display:block!important;width:100%!important;text-align:center!important;
+  margin-left:auto!important;margin-right:auto!important;
+}
+#ems-form3-print .ems-form3-council>.ems-form3-heading strong{font-size:20px!important;line-height:1.2!important}
+#ems-form3-print .ems-form3-council>.ems-form3-heading small{font-size:10px!important}
+#ems-form3-print .ems-form3-council>.ems-form3-heading b{font-size:14px!important;margin-top:5px!important}
+@media print{
+ body.ems-print-form3 #ems-form3-print .ems-form3-council>.ems-form3-heading{margin:0 auto 9px!important}
+ body.ems-print-form3 #ems-form3-print .ems-form3-council-summary{width:100%!important;margin:14px 0 0!important}
+ body.ems-print-form3 #ems-form3-print .ems-form3-council-summary table{width:100%!important;table-layout:auto!important}
+ body.ems-print-form3 #ems-form3-print .ems-form3-certificate>b{text-align:center!important}
+}
