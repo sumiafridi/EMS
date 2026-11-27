@@ -1188,72 +1188,71 @@ export default function App(){
  const showDemand=rows.length?demand:0;
  const lgeNavigation=[
   {title:"",pages:[{label:"Master Dashboard",section:"Overview"}]},
-  {title:"Settings & Data",pages:[
+  {title:"Settings & Basic Data",pages:[
    {label:"Settings & Rules",section:"Settings & Rules"},
+   {label:"DATA Import (Blocks)",section:"DATA Import"},
+   {label:"Tehsils Register",section:"Tehsils Register"},
+   {label:"Councils (NC / VC)",section:"Councils (NC/VC)"},
+   {label:"Census Blocks Register",section:"Census Blocks (unique)"},
    {label:"Upload New District",section:"Upload New District"},
    {label:"Download Templates",section:"Download Templates"},
-   {label:"About / Guide",section:"About / Guide"},
-   {label:"Checks (validation)",section:"Checks (validation)"},
-   {label:"Problems list",section:"Problems list"}
+   {label:"Checks & Validation",section:"Checks (validation)"},
+   {label:"Problems / Issues List",section:"Problems list"},
+   {label:"About / User Guide",section:"About / Guide"}
   ]},
-  {title:"Block & Electoral Area Registers",pages:[
-   {label:"DATA (Census Blocks)",section:"DATA Import"},
-   {label:"Tehsils",section:"Tehsils Register"},
-   {label:"Councils (NC/VC)",section:"Councils (NC/VC)"},
-   {label:"Blocks (unique)",section:"Census Blocks (unique)"},
-   {label:"Staff Stations",section:"Staff Stations Feed"},
+  {title:"Polling Station",pages:[
+   {label:"Polling Station Register & Block Transfers",section:"Polling Stations"},
+   {label:"Staff Station Feed",section:"Staff Stations Feed"}
+  ]},
+  {title:"Ballot Paper",pages:[
+   {label:"Form-III (Council)",section:"Form-III (Council)"},
+   {label:"Form-III (Per Station)",section:"Form-III Per Station"},
+   {label:"Proforma-A (Mayor / Chairman)",section:"Proforma-A (Mayor/Chairman Ballot)"},
+   {label:"Proforma-B (5 Categories)",section:"Proforma-B (5 Categories Ballot)"}
+  ]},
+  {title:"Duty & Session",pages:[
+   {label:"Staffing Demand / Duty Sessions",section:"Staff Demand"},
+   {label:"Tehsil Duty Summary",section:"Tehsil Duty Summary"},
    {label:"Tehsil Summary",section:"Tehsil Summary"}
   ]},
-  {title:"Polling Stations & Electoral Forms",pages:[
-   {label:"Stations",section:"Polling Stations"},
-   {label:"Form-III (Council)",section:"Form-III (Council)"},
-   {label:"Form-III Per Station",section:"Form-III Per Station"}
-  ]},
-  {title:"Training, Trainers & Venues",pages:[
-   {label:"Master Trainers",section:"Master Trainers"},
-   {label:"Training Venues",section:"Training Venues"},
-   {label:"Staff Training Register",section:"Staff Data"},
-   {label:"Training Batches",section:"Training Batches"},
-   {label:"Training Attendance",section:"Training Attendance"},
-   {label:"Training Dashboard",section:"Training Dashboard"},
-   {label:"Training Shortage Report",section:"Training Shortage Report"},
-   {label:"Batches Detail Summary",section:"Batches Detail Summary"},
-   {label:"Training Plan - Pres & Sr APO",section:"Training Plan - Pres & Sr APO"},
-   {label:"Training Plan - APO & PO",section:"Training Plan - APO & PO"},
-   {label:"Pairs - Pres & Sr APO",section:"Pairs - Pres & Sr APO"},
-   {label:"Pairs - APO & PO",section:"Pairs - APO & PO"},
-   {label:"Batches PROs/SR.APOs (M)",section:"Batches of PROs & Sr.APOs (Male)"},
-   {label:"Batches PROs/SR.APOs (F)",section:"Batches of PROs & Sr.APOs (Female)"},
-   {label:"Batches APOs/POs (M)",section:"Batches of APOs & POs (Male)"},
-   {label:"Batches APOs/POs (F)",section:"Batches of APOs & POs (Female)"}
-  ]},
-  {title:"Ballot Papers, Proformas & Packing",pages:[
-   {label:"Proforma-A (Mayor/Chairman)",section:"Proforma-A (Mayor/Chairman Ballot)"},
-   {label:"Proforma-B (5 Categories)",section:"Proforma-B (5 Categories Ballot)"},
-   {label:"Packing-Data",section:"Packing-Data"},
-   {label:"Packing-Invoice",section:"Packing-Invoice (Form-XIII)"},
+  {title:"Packing & Invoice",pages:[
+   {label:"Packing Data",section:"Packing-Data"},
+   {label:"Packing Invoice (Form-XIII)",section:"Packing-Invoice (Form-XIII)"},
    {label:"Tehsil Export",section:"Tehsil Export (Electoral Area Detail)"}
   ]},
-  {title:"Duties, Staffing & Deployment",pages:[
-   {label:"Staff Data",section:"Staff Data"},
-   {label:"Staffing Demand",section:"Staff Demand"},
-   {label:"Auto Assignments",section:"Duty Assignments"},
+  {title:"Training",pages:[
+   {label:"Staff Training Register",section:"Staff Data"},
+   {label:"Master Trainers",section:"Master Trainers"},
+   {label:"Training Venues",section:"Training Venues"},
+   {label:"Training Dashboard",section:"Training Dashboard"},
+   {label:"Training Plans — Presiding / Sr APO",section:"Training Plan - Pres & Sr APO"},
+   {label:"Training Plans — APO / PO",section:"Training Plan - APO & PO"},
+   {label:"Training Batches",section:"Training Batches"},
+   {label:"Training Attendance",section:"Training Attendance"},
+   {label:"Training Shortage Report",section:"Training Shortage Report"},
+   {label:"Batch Detail Summary",section:"Batches Detail Summary"},
+   {label:"Pairs — Presiding / Sr APO",section:"Pairs - Pres & Sr APO"},
+   {label:"Pairs — APO / PO",section:"Pairs - APO & PO"},
+   {label:"Presiding / Sr APO Batches (Male)",section:"Batches of PROs & Sr.APOs (Male)"},
+   {label:"Presiding / Sr APO Batches (Female)",section:"Batches of PROs & Sr.APOs (Female)"},
+   {label:"APO / PO Batches (Male)",section:"Batches of APOs & POs (Male)"},
+   {label:"APO / PO Batches (Female)",section:"Batches of APOs & POs (Female)"}
+  ]},
+  {title:"Election Duty",pages:[
+   {label:"Staff Register",section:"Staff Data"},
+   {label:"Auto Duty Assignments",section:"Duty Assignments"},
    {label:"Manual Duty Adjustment",section:"Duty Assignments"},
-   {label:"Form-I — List of Polling Staff",section:"Form-I — List of Polling Staff"},
+   {label:"Form-I — Polling Staff List",section:"Form-I — List of Polling Staff"},
    {label:"Form-II — Appointment Orders",section:"Form-II — Appointment Orders"},
    {label:"Emergency / Reserve Staff",section:"Reserve Staff"},
-   {label:"Unassigned Staff",section:"Vacant Posts"},
+   {label:"Unassigned Staff / Vacant Posts",section:"Vacant Posts"},
+   {label:"Vacant Stations",section:"Vacant Stations"},
    {label:"Staff Assignment Format",section:"Staff Assignment Format"},
    {label:"Staffing Gap Analysis",section:"Staffing Gap Analysis"},
-   {label:"Vacant Posts",section:"Vacant Posts"},
-   {label:"Vacant Stations",section:"Vacant Stations"},
-   {label:"Cross-Tehsil Flow",section:"Cross-Tehsil Assignments"},
-   {label:"Cross-Tehsil Assignments",section:"Cross-Tehsil Assignments"},
-   {label:"Tehsil Duty Summary",section:"Tehsil Duty Summary"}
+   {label:"Cross-Tehsil Assignments",section:"Cross-Tehsil Assignments"}
   ]},
-  {title:"Backup & Other Tools",pages:[
-   {label:"Backup & Restore",section:"Export All"},
-   {label:"Export All",section:"Export All"}
+  {title:"System Tools",pages:[
+   {label:"Backup & Restore / Export All",section:"Export All"}
   ]}
  ];
  if(!session)return <div className="auth-screen"><div className="auth-card"><div className="brand-mark">E</div><h1>KPK Election EMS</h1><p>Secure district access · Supabase cloud database</p><label>Email address<input value={email} onChange={e=>setEmail(e.target.value)} type="email" placeholder="Your authorized account email"/></label><button className="btn primary" disabled={busy} onClick={sendLogin}>{busy?"Sending…":"Send secure sign-in link"}</button><small>Only authorized EMS accounts can access district records.</small><div className="notice">{notice}</div></div></div>;
