@@ -175,3 +175,32 @@
 .ems-form3-council-summary th,.ems-form3-council-summary td{border:1px solid #333;padding:4px 3px;text-align:center;overflow-wrap:anywhere}
 .ems-form3-council-summary th{background:#f0f9ff}
 @media print{body.ems-print-form3 .ems-form3-council-summary table{font-size:6.5pt}body.ems-print-form3 .ems-form3-council-summary th,body.ems-print-form3 .ems-form3-council-summary td{padding:2px 1px}}
+
+/* Form-III reference layout: centered heading, compact council summary and certificate */
+.ems-form3-heading{display:flex!important;flex-direction:column;align-items:center;justify-content:center;text-align:center!important;width:100%;margin:0 auto 14px!important}
+.ems-form3-heading strong,.ems-form3-heading small,.ems-form3-heading b{display:block;width:100%;text-align:center!important}
+.ems-form3-heading strong{font-size:20px;line-height:1.25}
+.ems-form3-heading small{font-size:10px}
+.ems-form3-heading b{font-size:14px;line-height:1.3;margin-top:7px}
+.ems-form3-council-summary{margin-top:18px;font-size:9px;color:#172b3b}
+.ems-form3-council-summary>b{display:block;text-align:left;font-size:11px;margin-bottom:5px}
+.ems-form3-council-summary table{width:100%;border-collapse:collapse;table-layout:auto;font-size:8.5px}
+.ems-form3-council-summary th,.ems-form3-council-summary td{border:1px solid #333;padding:4px 3px;text-align:left;white-space:nowrap}
+.ems-form3-council-summary th{background:#eef4f8;font-weight:700}
+.ems-form3-council-summary td:nth-child(n+7){text-align:right;font-variant-numeric:tabular-nums}
+.ems-form3-certificate{margin-top:26px;font-size:10px;color:#17324b}
+.ems-form3-certificate>b{display:block;text-align:center;font-size:12px;margin-bottom:10px}
+.ems-form3-certificate p{margin:8px 0}
+.ems-form3-certificate ol{margin:7px 0 0;padding-left:17px}
+.ems-form3-certificate li{padding:2px 0;line-height:1.35}
+.ems-form3-signatures{display:grid!important;grid-template-columns:1fr 1fr;gap:40px;margin:36px 0 0!important;text-align:center;font-size:10px;color:#17324b}
+.ems-form3-signatures>div{line-height:1.35}
+.ems-form3-signatures>div:before{content:"";display:block;width:200px;max-width:85%;border-top:1px solid #333;margin:0 auto 7px}
+@media print{
+ body.ems-print-form3 .ems-form3-heading{margin:0 auto 10px!important}
+ body.ems-print-form3 .ems-form3-council-summary{margin-top:12px}
+ body.ems-print-form3 .ems-form3-council-summary table{font-size:6.5pt}
+ body.ems-print-form3 .ems-form3-council-summary th,body.ems-print-form3 .ems-form3-council-summary td{padding:2px 2px}
+ body.ems-print-form3 .ems-form3-certificate{margin-top:20px;font-size:8pt}
+ body.ems-print-form3 .ems-form3-signatures{margin-top:28px!important;font-size:8pt}
+}
