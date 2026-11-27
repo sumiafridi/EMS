@@ -19,7 +19,7 @@
 
 .voter-bar-row{padding:11px 2px;border-bottom:1px solid #edf1f4}
 .voter-bar-row>div:first-child{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:#5d7183}
-.voter-bar-row b{font:800 13px Manrope;color:#173a55}
+.voter-bar b{font:800 13px Manrope;color:#173a55}
 .voter-bar{height:7px;background:#edf2f5;border-radius:8px;overflow:hidden;margin:8px 0 5px}
 .voter-bar i{display:block;height:100%;background:#159b8d;border-radius:8px}
 .voter-bar-row small{font-size:10px;color:#8a9aaa}
@@ -75,3 +75,26 @@
 @media(max-width:650px){.modal-backdrop{padding:8px}.modal-card{max-height:calc(100vh - 16px);padding:15px}.record-form-grid{grid-template-columns:1fr}}
 
 .row-invalid td{background:#fff1ef!important;color:#8d3028!important}.upload-warning{padding:10px 12px;border:1px solid #f1c7c1;border-radius:8px;background:#fff5f3;color:#8d3028;font-size:12px;margin:10px 0}
+
+/* Keep the complete LGE navigation accessible without moving the page itself. */
+.sidebar{height:100vh;height:100dvh;min-height:0;overflow:hidden}
+.sidebar nav{display:block;flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;padding:0 5px 12px 0;scrollbar-width:thin;scrollbar-color:#54718a #102a43}
+.sidebar nav::-webkit-scrollbar{width:7px}
+.sidebar nav::-webkit-scrollbar-track{background:#102a43}
+.sidebar nav::-webkit-scrollbar-thumb{background:#54718a;border-radius:8px}
+.sidebar .nav-group{display:grid;gap:3px;margin-bottom:12px}
+.sidebar .nav{display:block;width:100%;white-space:normal;line-height:1.35}
+.sidebar .side-foot{flex:0 0 auto;margin-top:0}
+@media(max-width:850px){
+ .sidebar{width:252px;padding:18px 14px}
+ .brand>div:last-child,.district-label,.district,.side-foot,.nav:not(.active){display:initial}
+ .brand{padding:0 7px 20px}
+ .sidebar nav{display:block}
+ .nav{font-size:13px;padding:10px 12px}
+ .main{margin-left:252px;padding:22px 16px}
+ .district-select{margin-bottom:12px}
+}
+@media(max-width:520px){
+ .sidebar{width:min(82vw,290px);z-index:20;box-shadow:8px 0 28px rgba(10,30,50,.2)}
+ .main{margin-left:min(82vw,290px);padding:18px 12px}
+}
