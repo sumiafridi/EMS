@@ -98,3 +98,73 @@
  .sidebar{width:min(82vw,290px);z-index:20;box-shadow:8px 0 28px rgba(10,30,50,.2)}
  .main{margin-left:min(82vw,290px);padding:18px 12px}
 }
+
+
+/* Reference-style election forms and print layouts */
+.form-document-panel{overflow:visible}
+.form-screen-filters{margin:10px 0 16px;align-items:center}
+.form-screen-filters input,.form-screen-filters select{min-width:180px;border:1px solid #dce5ec;border-radius:7px;padding:9px 10px;background:#fff;color:#233e55;font:12px 'DM Sans'}
+.ems-form3-print,.ems-proforma-print{background:#fff;color:#172b3b}
+.ems-form3-council{background:#fff;color:#111;margin:18px 0 28px;padding:20px;border:1px solid #cbd5e1}
+.ems-form3-heading{text-align:center;display:grid;gap:3px;margin-bottom:14px}
+.ems-form3-heading strong{font-size:20px}.ems-form3-heading small{font-size:11px;color:#555}.ems-form3-heading b{font-size:14px;margin-top:7px}
+.ems-form3-meta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:11px;margin:8px 0}
+.ems-form3-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:9px;line-height:1.2}
+.ems-form3-table th,.ems-form3-table td{border:1px solid #333;padding:4px 3px;vertical-align:middle;overflow-wrap:anywhere;word-break:break-word}
+.ems-form3-table th{text-align:center;background:#f1f5f9}
+.ems-form3-table .num,.ems-form3-table .right{text-align:right;font-variant-numeric:tabular-nums}
+.ems-form3-table td small{display:block;font-size:8px;color:#475569;margin:2px 0}
+.ems-form3-station-total{background:#fef3c7;font-weight:700}
+.ems-form3-table tfoot{background:#dbeafe;font-weight:800}
+.ems-form3-certificate{margin-top:14px;font-size:10px}.ems-form3-certificate p{margin:5px 0}
+.ems-form3-signatures{display:flex;justify-content:space-between;gap:30px;margin-top:32px;text-align:center;font-size:10px}
+.ems-total-strip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:12px 0 18px}
+.ems-total-strip>div{border:1px solid #d7e1e8;border-radius:7px;padding:10px;background:#f8fafc;min-width:0}
+.ems-total-strip span{display:block;color:#64748b;font-size:10px}.ems-total-strip b{display:block;margin-top:4px;font-size:15px;color:#173a55;overflow-wrap:anywhere}
+.ems-proforma-print h4{font-size:13px;margin:16px 0 7px;color:#173a55}
+.ems-proforma-print table{width:100%;border-collapse:collapse;font-size:10px}
+.ems-proforma-print th,.ems-proforma-print td{border:1px solid #cbd5e1;padding:6px 7px;text-align:left}
+.ems-proforma-print th{background:#eef4f8}
+.ems-proforma-print .ems-district-total th{background:#dbeafe;font-weight:800}
+.ems-packing-invoice{box-sizing:border-box;width:100%;min-height:320mm;background:#fff;color:#111;padding:9mm;margin:12px auto;display:flex;flex-direction:column;gap:9px;border:1px solid #cbd5e1;font-size:10px}
+.ems-packing-invoice header{text-align:center;display:grid;gap:2px;margin-bottom:3px}
+.ems-packing-invoice header>b{font-size:17px}.ems-packing-invoice header small{font-size:10px}.ems-packing-invoice header h2{font-size:16px;margin:4px 0 0}.ems-packing-invoice header span{font-size:10px}
+.ems-packing-invoice table{width:100%;border-collapse:collapse;table-layout:fixed}
+.ems-packing-invoice th,.ems-packing-invoice td{border:1px solid #333;padding:6px 5px;vertical-align:middle;overflow-wrap:anywhere;word-break:break-word}
+.ems-packing-invoice th{font-weight:700;text-align:left;background:#f8fafc}
+.ems-pi-details th:first-child{width:29%}
+.ems-pi-ballot{font-size:8px}
+.ems-pi-ballot th,.ems-pi-ballot td{text-align:center;padding:8px 3px;min-height:55px}
+.ems-pi-ballot td:first-child{text-align:left}
+.ems-pi-code-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 22px;font-size:9px;padding:5px 3px}
+.ems-pi-items th{width:78%}.ems-pi-items td{text-align:center;width:22%}
+.ems-pi-received{text-align:center;font-weight:700;margin-top:10px}
+.ems-pi-signatures{display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:20px;text-align:center;font-size:10px}
+.ems-pi-signatures>div{border-top:1px solid #222;padding-top:6px}
+.ems-pi-date{text-align:right;margin-top:10px}
+@page emsForm3Page{size:legal landscape;margin:6mm}
+@page emsPackingPage{size:legal portrait;margin:8mm}
+@media print{
+ body.ems-print-form3 *{visibility:hidden!important}
+ body.ems-print-form3 #ems-form3-print,body.ems-print-form3 #ems-form3-print *{visibility:visible!important}
+ body.ems-print-form3 #ems-form3-print{position:absolute;left:0;top:0;width:100%;background:#fff}
+ body.ems-print-form3 .ems-form3-council{page:emsForm3Page;break-after:page;page-break-after:always;border:0;margin:0;padding:0}
+ body.ems-print-form3 .ems-form3-council:last-child{break-after:auto;page-break-after:auto}
+ body.ems-print-form3 .ems-form3-table{font-size:7pt;line-height:1.1}
+ body.ems-print-form3 .ems-form3-table th,body.ems-print-form3 .ems-form3-table td{padding:2px 2px}
+ body.ems-print-form3 .ems-form3-heading{margin-bottom:7px}
+ body.ems-print-form3 .ems-form3-signatures{margin-top:18px}
+ body.ems-print-proforma *{visibility:hidden!important}
+ body.ems-print-proforma .ems-proforma-print,body.ems-print-proforma .ems-proforma-print *{visibility:visible!important}
+ body.ems-print-proforma .ems-proforma-print{position:absolute;left:0;top:0;width:100%;background:#fff}
+ body.ems-print-proforma .table-wrap{overflow:visible!important}
+ body.ems-print-proforma table{font-size:8pt}
+ body.ems-print-proforma th,body.ems-print-proforma td{padding:3px 4px}
+ body.ems-print-packing *{visibility:hidden!important}
+ body.ems-print-packing #ems-packing-invoice-print,body.ems-print-packing #ems-packing-invoice-print *{visibility:visible!important}
+ body.ems-print-packing #ems-packing-invoice-print{position:absolute;left:0;top:0;width:100%;min-height:0;height:auto;page:emsPackingPage;margin:0;padding:0;border:0}
+ body.ems-print-packing #ems-packing-invoice-print table{width:100%;table-layout:fixed}
+ body.ems-print-packing #ems-packing-invoice-print th,body.ems-print-packing #ems-packing-invoice-print td{padding:4px 3px;font-size:8pt;line-height:1.2}
+ body.ems-print-packing #ems-packing-invoice-print .ems-pi-ballot th,body.ems-print-packing #ems-packing-invoice-print .ems-pi-ballot td{font-size:7pt;padding:5px 2px}
+}
+@media(max-width:850px){.ems-total-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.ems-form3-council{padding:10px}.ems-form3-table{min-width:900px}.ems-packing-invoice{padding:6mm;min-height:0}}
