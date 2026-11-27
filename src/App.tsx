@@ -134,9 +134,11 @@ export default function App(){
  async function loadDistrictData():Promise<boolean>{
   setNotice("Loading district records from Supabase…");
   const globalSettingsQ=await supabase.from("global_election_settings").select("setting_key,setting_value,is_locked").order("setting_key");
-  if(globalSettingsQ.error){setNotice("Could not load Super Admin settings: "+globalSettingsQ.error.message);return false;}
-  setGlobalSettings(globalSettingsQ.data||[]);
-  setGlobalSettingsDraft(Object.fromEntries((globalSettingsQ.data||[]).map((r:any)=>[r.setting_key,{value:typeof r.setting_value==="string"?r.setting_value:JSON.stringify(r.setting_value??""),locked:!!r.is_locked}])));
+  // Global Super Admin settings are optional for district operations. A permission
+  // error here must never prevent the selected district's own records from loading.
+  const readableGlobalSettings=globalSettingsQ.error?[]:(globalSettingsQ.data||[]);
+  setGlobalSettings(readableGlobalSettings);
+  setGlobalSettingsDraft(Object.fromEntries(readableGlobalSettings.map((r:any)=>[r.setting_key,{value:typeof r.setting_value==="string"?r.setting_value:JSON.stringify(r.setting_value??""),locked:!!r.is_locked}])));
   const [t,c,s,b,a,staffCount,trainerCount,venueCount,ruleCount,planCount,settingsCount,assignmentCount,reserveCount,batchCount,participantCount,attendanceCount,importsQ,issuesQ]=await Promise.all([
    supabase.from("election_tehsils").select("id",{count:"exact",head:true}).eq("district_id",districtId),
    supabase.from("election_councils").select("id",{count:"exact",head:true}).eq("district_id",districtId),
