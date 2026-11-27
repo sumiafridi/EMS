@@ -1217,6 +1217,49 @@ export default function App(){
    default:return [];
   }
  },[section,sortedStations,activeDistrict,blockRecords,allocationRecords,stations,staffRecords,operationalSummary,dashboard,trainingPlanRecords,batchRecords,venueRecords,participantRecords,attendanceRecords,reserveSummary]);
+ function exportForm3Excel(){
+  const wb=XLSX.utils.book_new();
+  const aoa:any[][]=[];
+  const merges:any[]=[];
+  const rowHeights:any[]=[];
+  const colWidths=[8,24,18,13,18,13,13,12,12,12,11,11,12];
+  const title=String(settingsDraft["Form title"]||"LIST OF POLLING STATIONS FOR LOCAL COUNCILS\\n(LG BYE ELECTIONS IN KOHAT 2023)").trim();
+  const add=(cells:any[],height?:number)=>{const r=aoa.length;aoa.push(cells);if(height)rowHeights[r]={hpt:height};return r;};
+  const merge=(r:number,c1:number,c2:number)=>merges.push({s:{r,c:c1},e:{r,c:c2}});
+  form3VisibleGroups.forEach((g:any,gi:number)=>{
+   if(gi)add([],18);
+   let r=add(["FORM-III"]);merge(r,0,12);
+   r=add(["[See rule 13 (1)]"]);merge(r,0,12);
+   const titleLines=title.split(/\\r?\\n/);titleLines.forEach((line:string)=>{const rr=add([line]);merge(rr,0,12);});
+   r=add(["No. & Name of Local Council:",g.number+" - "+g.name+" ("+g.type+")","District:",districtName,"Tehsil:",g.tehsil]);merge(r,1,2);merge(r,3,4);merge(r,5,6);
+   const header1=add(["Sr. No.","No. & Name of Polling Station","Rural Electoral Area","Rural Block","Urban Electoral Area","Urban Block","S. No. of voters on electoral roll","Male voters","Female voters","Total voters","Male booths","Female booths","Total booths"]);
+   const sts=g.stations||[];
+   sts.forEach((st:any,si:number)=>{
+    const blocks=st.blocks?.length?st.blocks:[{}];
+    blocks.forEach((b:any,bi:number)=>add([String(si+1)+"."+(bi+1),(st.stationType||g.type)+" PS No. "+(st.psNo||"—")+" — "+(st.stationName||""),b.ruralArea||"",b.ruralBlock||b.code||"",b.urbanArea||"",b.urbanBlock||"",Number(b.maleVoters||0)+Number(b.femaleVoters||0),Number(b.maleVoters||0),Number(b.femaleVoters||0),Number(b.maleVoters||0)+Number(b.femaleVoters||0),"","",""]));
+    const total=add(["","","","","","Polling Station Total — "+(st.stationName||""),"",st.maleVoters,st.femaleVoters,st.totalVoters,st.maleBooths,st.femaleBooths,st.totalBooths]);
+    merge(total,0,5);
+   });
+   const totals=sts.reduce((a:any,x:any)=>({male:a.male+Number(x.maleVoters||0),female:a.female+Number(x.femaleVoters||0),total:a.total+Number(x.totalVoters||0),mb:a.mb+Number(x.maleBooths||0),fb:a.fb+Number(x.femaleBooths||0),tb:a.tb+Number(x.totalBooths||0)}),{male:0,female:0,total:0,mb:0,fb:0,tb:0});
+   const m=sts.filter((x:any)=>String(x.stationType).toLowerCase()==="male").length,f=sts.filter((x:any)=>String(x.stationType).toLowerCase()==="female").length,c=sts.filter((x:any)=>String(x.stationType).toLowerCase()==="combined").length;
+   add(["VC/NC-wise Summary for "+g.number+" - "+g.name+":"]);
+   add(["COUNCIL","TYPE","STATIONS","M STNS","F STNS","C STNS","M VOTERS","F VOTERS","TOTAL","M BOOTHS","F BOOTHS","TOTAL BOOTHS","BALLOT PAPERS"]);
+   add([g.name,g.type,sts.length,m,f,c,totals.male,totals.female,totals.total,totals.mb,totals.fb,totals.tb,Math.ceil(totals.total/100)*100]);
+   r=add(["CERTIFICATE"]);merge(r,0,12);
+   ["It is hereby certified:-","1. That No Electoral Area forming part of Constituency is left out.","2. That all the polling stations are within the radius of two KM/from the residence of the voters.","3. That correct assignment of voters has been given against each polling station and total voters at each electoral area have been checked their correctness.","4. That all the buildings of polling stations were got verified by the committee and are in operative condition.","5. No polling station is located out side the boundaries of the constituency."].forEach((line:string)=>{const rr=add([line]);merge(rr,0,12);});
+   add([]);
+   r=add(["(Muhammad Nawaz)","","","","","","","","","","","(Abdul Wakeel)"]);merge(r,0,5);merge(r,7,12);
+   r=add(["District Returning Officer / Deputy Commissioner, Kohat","","","","","","","","","","","Returning Officer / AD IT REC Kohat, Kohat"]);merge(r,0,5);merge(r,7,12);
+  });
+  if(!form3VisibleGroups.length) add(["No council records available for the selected filters."]);
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws["!merges"]=merges;ws["!cols"]=colWidths.map(w=>({wch:w}));ws["!rows"]=rowHeights;
+  ws["!pageSetup"]={paperSize:5,orientation:"landscape",fitToWidth:1,fitToHeight:0,scale:85};
+  ws["!margins"]={left:0.25,right:0.25,top:0.45,bottom:0.45,header:0.2,footer:0.2};
+  ws["!autofilter"]={ref:"A1:M"+aoa.length};
+  XLSX.utils.book_append_sheet(wb,ws,"Form-III Council");
+  XLSX.writeFile(wb,"Form-III_Council_"+(activeDistrict?.code||"district")+".xlsx");
+ }
  function exportCurrentReport(){const wb=XLSX.utils.book_new();const data=reportRows.map((r:any)=>({...r}));const ws=XLSX.utils.json_to_sheet(data.length?data:[{Status:"No records currently available"}]);XLSX.utils.book_append_sheet(wb,ws,section.slice(0,31));XLSX.writeFile(wb,(section.replace(/[^a-z0-9]+/gi,"_")||"Report")+"_"+(activeDistrict?.code||"district")+".xlsx");}
  const filteredReportRows=reportRows.filter((r:any)=>{const q=reportSearch.trim().toLowerCase();const t=reportTehsil.trim().toLowerCase();const values=Object.values(r).join(" ").toLowerCase();return (!q||values.includes(q))&&(!t||String(r.Tehsil||"").toLowerCase()===t);});
  const proformaASummary=useMemo(()=>{const m=new Map<string,any>();(reportRows||[]).forEach((r:any)=>{if(!("RegisteredVoters" in r))return;const t=String(r.Tehsil||"Unspecified");const x=m.get(t)||{Tehsil:t,PollingStations:0,RegisteredVoters:0,BallotPapers:0,BallotBooks:0};x.PollingStations++;x.RegisteredVoters+=Number(r.RegisteredVoters||0);x.BallotPapers+=Number(r.BallotPapers||0);x.BallotBooks+=Number(r.BallotBooks||0);m.set(t,x);});return [...m.values()].sort((a,b)=>a.Tehsil.localeCompare(b.Tehsil));},[reportRows]);
@@ -1375,7 +1418,7 @@ export default function App(){
  {section==="Training Batches"&&<div className="panel"><h3>Training Batch Register</h3><p>Batch schedule, gender group, venue and capacity. Missing staff/seat information is shown from batch_data where recorded.</p><div className="table-wrap"><table><thead><tr><th>Batch</th><th>Date</th><th>Role Group</th><th>Gender</th><th>Venue</th><th>Capacity</th><th>Participants</th><th>Missing Staff</th></tr></thead><tbody>{batchRecords.map((b:any)=>{const count=participantRecords.filter(p=>p.batch_id===b.id).length;return <tr key={b.id}><td>{b.batch_number}</td><td>{b.training_date||"—"}</td><td>{b.role_group||"—"}</td><td>{b.gender_group||"—"}</td><td>{venueRecords.find(v=>v.id===b.venue_id)?.name||"Not assigned"}</td><td>{b.capacity??"—"}</td><td>{count}</td><td>{b.batch_data?.missing_staff_count??0}</td></tr>;})}</tbody></table></div>{!batchRecords.length&&<div className="empty">No training batches have been generated yet.</div>}</div>}
  {section==="Training Attendance"&&<div className="panel"><h3>Training Attendance Register</h3><p>Attendance is read from the attendance table; participants without a saved attendance record remain pending.</p><div className="table-wrap"><table><thead><tr><th>Sr.</th><th>Staff Name</th><th>Role</th><th>Gender</th><th>Batch</th><th>Attendance Date</th><th>Status</th><th>Remarks</th></tr></thead><tbody>{attendanceRecords.map((a:any,i:number)=>{const p=participantRecords.find(x=>x.id===a.participant_id),st=staffRecords.find(x=>x.id===p?.staff_id),b=batchRecords.find(x=>x.id===p?.batch_id);return <tr key={a.id}><td>{i+1}</td><td>{st?.name||p?.participant_data?.staff_name||"—"}</td><td>{p?.participant_data?.role||"—"}</td><td>{st?.gender||p?.participant_data?.gender||"—"}</td><td>{b?.batch_number??"—"}</td><td>{a.attendance_date}</td><td>{a.status}</td><td>{a.remarks||""}</td></tr>;})}</tbody></table></div>{!attendanceRecords.length&&<div className="empty">No attendance has been recorded yet.</div>}</div>}
  {section==="Form-III (Council)"&&<div className="panel form-document-panel">
-  <div className="panel-head"><div><h3>FORM-III — List of Polling Stations for Local Councils</h3><p>Reference-style council-wise form. Each council starts on a new page; station block rows and station totals remain together.</p></div><div className="header-actions"><button className="btn light" onClick={()=>{setReportSearch("");setReportTehsil("");}}>Clear filters</button><button className="btn primary" onClick={()=>printEmsDocument("ems-print-form3")}>Print / Save PDF</button><button className="btn light" onClick={exportCurrentReport}>Export Excel</button></div></div>
+  <div className="panel-head"><div><h3>FORM-III — List of Polling Stations for Local Councils</h3><p>Reference-style council-wise form. Each council starts on a new page; station block rows and station totals remain together.</p></div><div className="header-actions"><button className="btn light" onClick={()=>{setReportSearch("");setReportTehsil("");}}>Clear filters</button><button className="btn primary" onClick={()=>printEmsDocument("ems-print-form3")}>Print / Save PDF</button><button className="btn light" onClick={exportForm3Excel}>Download Form-III Excel</button><button className="btn light" onClick={exportCurrentReport}>Export Data Excel</button></div></div>
   <div className="header-actions form-screen-filters"><input value={reportSearch} onChange={e=>setReportSearch(e.target.value)} placeholder="Search council or polling station…"/><select value={reportTehsil} onChange={e=>setReportTehsil(e.target.value)}><option value="">All Tehsils</option>{tehsilOrder.map(t=><option key={t} value={t}>{t}</option>)}</select><span className="tag">{form3VisibleGroups.length} councils</span></div>
   <div id="ems-form3-print" className="ems-form3-print">
    {form3VisibleGroups.map((g:any)=>{
