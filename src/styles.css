@@ -168,3 +168,10 @@
  body.ems-print-packing #ems-packing-invoice-print .ems-pi-ballot th,body.ems-print-packing #ems-packing-invoice-print .ems-pi-ballot td{font-size:7pt;padding:5px 2px}
 }
 @media(max-width:850px){.ems-total-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.ems-form3-council{padding:10px}.ems-form3-table{min-width:900px}.ems-packing-invoice{padding:6mm;min-height:0}}
+
+.ems-form3-council-summary{margin-top:14px;font-size:10px}
+.ems-form3-council-summary>b{display:block;margin-bottom:5px}
+.ems-form3-council-summary table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:8.5px}
+.ems-form3-council-summary th,.ems-form3-council-summary td{border:1px solid #333;padding:4px 3px;text-align:center;overflow-wrap:anywhere}
+.ems-form3-council-summary th{background:#f0f9ff}
+@media print{body.ems-print-form3 .ems-form3-council-summary table{font-size:6.5pt}body.ems-print-form3 .ems-form3-council-summary th,body.ems-print-form3 .ems-form3-council-summary td{padding:2px 1px}}
