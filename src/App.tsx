@@ -1380,7 +1380,7 @@ export default function App(){
   <div id="ems-form3-print" className="ems-form3-print">
    {form3VisibleGroups.map((g:any)=>{
     const stationsInCouncil=g.stations||[];
-    const totals=stationsInCouncil.reduce((a:any,x:any)=>({male:a.male+x.maleVoters,female:a.female+x.femaleVoters,total:a.total+x.totalVoters,maleBooths:a.maleBooths+x.maleBooths,femaleBooths:a.femaleBooths+x.femaleBooths,totalBooths:a.totalBooths+x.totalBooths}),{male:0,female:0,total:0,maleBooths:0,femaleBooths:0,totalBooths:0});
+    const totals=stationsInCouncil.reduce((a:any,x:any)=>({male:a.male+x.maleVoters,female:a.female+x.femaleVoters,total:a.total+x.totalVoters,maleBooths:a.maleBooths+x.maleBooths,femaleBooths:a.femaleBooths+x.femaleBooths,totalBooths:a.totalBooths+x.totalBooths}),{male:0,female:0,total:0,maleBooths:0,femaleBooths:0,totalBooths:0});const maleStationCount=stationsInCouncil.filter((x:any)=>String(x.stationType).toLowerCase()==="male").length,femaleStationCount=stationsInCouncil.filter((x:any)=>String(x.stationType).toLowerCase()==="female").length,combinedStationCount=stationsInCouncil.filter((x:any)=>String(x.stationType).toLowerCase()==="combined").length;
     return <section className="ems-form3-council" key={g.key}>
      <header className="ems-form3-heading"><strong>FORM-III</strong><small>[See rule 13 (1)]</small><b>LIST OF POLLING STATIONS FOR LOCAL COUNCILS</b></header>
      <div className="ems-form3-meta"><span><b>No. &amp; Name of Local Council:</b> {g.number} - {g.name} ({g.type})</span><span><b>District:</b> {districtName}</span><span><b>Tehsil:</b> {g.tehsil}</span></div>
@@ -1395,6 +1395,7 @@ export default function App(){
       })}
       <tfoot><tr><th colSpan={7} className="right">Council Total</th><th>{totals.male.toLocaleString()}</th><th>{totals.female.toLocaleString()}</th><th>{totals.total.toLocaleString()}</th><th>{totals.maleBooths}</th><th>{totals.femaleBooths}</th><th>{totals.totalBooths}</th></tr></tfoot>
      </table>
+     <div className="ems-form3-council-summary"><b>NC / VC-wise Summary for {g.number} - {g.name} ({g.type})</b><table><thead><tr><th>Council</th><th>Type</th><th>Stations</th><th>Male Stns</th><th>Female Stns</th><th>Combined</th><th>Male Voters</th><th>Female Voters</th><th>Total Voters</th><th>Male Booths</th><th>Female Booths</th><th>Total Booths</th></tr></thead><tbody><tr><td>{g.number} - {g.name}</td><td>{g.type}</td><td>{stationsInCouncil.length}</td><td>{maleStationCount}</td><td>{femaleStationCount}</td><td>{combinedStationCount}</td><td>{totals.male.toLocaleString()}</td><td>{totals.female.toLocaleString()}</td><td>{totals.total.toLocaleString()}</td><td>{totals.maleBooths}</td><td>{totals.femaleBooths}</td><td>{totals.totalBooths}</td></tr></tbody></table></div>
      <div className="ems-form3-certificate"><b>CERTIFICATE</b><p>It is hereby certified that the particulars shown above have been checked and verified.</p></div>
      <div className="ems-form3-signatures"><div>_________________________<br/>Returning Officer</div><div>_________________________<br/>District Election Officer</div></div>
     </section>;
