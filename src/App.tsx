@@ -703,13 +703,17 @@ export default function App(){
   if(!presPlan||!apoPlan){setNotice("Both training programme definitions are required before batch generation.");return;}
   const normRole=(v:string)=>{const x=String(v||"").toLowerCase().replace(/[^a-z]/g,"");if(x==="presiding"||x==="presidingofficer"||x==="pro")return "Presiding Officer";if(x==="seniorapo"||x==="srapo")return "Senior APO";if(x==="apo")return "APO";if(x==="po"||x==="pollingofficer")return "PO";return String(v||"");};
   const staffById=new Map(staffRecords.map((x:any)=>[x.id,x]));
-  const trainedStaffIds=new Set(participantRecords.filter((p:any)=>attendanceRecords.some((a:any)=>a.participant_id===p.id&&["present","attended"].includes(String(a.status||"").toLowerCase()))).map((p:any)=>p.staff_id));
+  const trainedStaffIds=new Set(participantRecords.filter((p:any)=>!["historical","superseded"].includes(String(p.status||"").toLowerCase())&&attendanceRecords.some((a:any)=>a.participant_id===p.id&&["present","attended"].includes(String(a.status||"").toLowerCase()))).map((p:any)=>p.staff_id));
   const allPeople:any[]=[];
   const readStaff=(st:any,...keys:string[])=>{for(const k of keys){const v=st?.[k]??st?.source_data?.[k];if(v!==undefined&&v!==null&&String(v).trim()!=="")return String(v).trim();}return "";};
   const duplicateCnic=new Map<string,number>();staffRecords.forEach((st:any)=>{const c=readStaff(st,"cnic","CNIC #").replace(/\D/g,"");if(c)duplicateCnic.set(c,(duplicateCnic.get(c)||0)+1);});
   const eligibleTrainingStaff=staffRecords.filter((st:any)=>{const name=readStaff(st,"name","Name of Officer/Official"),g=readStaff(st,"gender","Gender").toLowerCase(),bps=Number(readStaff(st,"bps_text","BPS")),av=readStaff(st,"availability","Availability (Y/N)").toLowerCase(),c=readStaff(st,"cnic","CNIC #").replace(/\D/g,"");return !!name&&(g==="male"||g==="female")&&Number.isInteger(bps)&&bps>=7&&["y","yes","available"].includes(av)&&(!c||duplicateCnic.get(c)===1);});
-  const rolePool=(role:string,gender:string)=>eligibleTrainingStaff.filter((st:any)=>{const g=readStaff(st,"gender","Gender").toLowerCase(),bps=Number(readStaff(st,"bps_text","BPS"));return g===gender&&(role==="Presiding Officer"||role==="Senior APO"?bps>=16:bps>=7&&bps<=15);});
-  for(const gender of ["male","female"]){for(const role of ["Presiding Officer","Senior APO","APO","PO"]){const target=reserveSummary.categories.find((x:any)=>x.role===role&&x.gender.toLowerCase()===gender)?.training||0;const pool=rolePool(role,gender).filter((st:any)=>!trainedStaffIds.has(st.id)).sort((a:any,b:any)=>Number(readStaff(b,"bps_text","BPS"))-Number(readStaff(a,"bps_text","BPS")));for(const st of pool.slice(0,target)){allPeople.push({staff_id:st.id,role,gender,name:readStaff(st,"name","Name of Officer/Official"),source:"Staff Register"});}}}
+  const selectedTrainingStaff=new Set<string>();
+  for(const gender of ["male","female"]){for(const role of ["Presiding Officer","Senior APO","APO","PO"]){
+   const target=reserveSummary.categories.find((x:any)=>x.role===role&&String(x.gender).toLowerCase()===gender)?.training||0;
+   const pool=eligibleTrainingStaff.filter((st:any)=>readStaff(st,"gender","Gender").toLowerCase()===gender&&(role==="Presiding Officer"||role==="Senior APO"?Number(readStaff(st,"bps_text","BPS"))>=16:Number(readStaff(st,"bps_text","BPS"))>=7&&Number(readStaff(st,"bps_text","BPS"))<=15)&&!trainedStaffIds.has(st.id)&&!selectedTrainingStaff.has(st.id)).sort((a:any,b:any)=>Number(readStaff(b,"bps_text","BPS"))-Number(readStaff(a,"bps_text","BPS")));
+   for(const st of pool.slice(0,target)){selectedTrainingStaff.add(st.id);allPeople.push({staff_id:st.id,role,gender,name:readStaff(st,"name","Name of Officer/Official"),source:"Staff Register"});}
+  }}
   const usedPeople=new Set<string>();const batchesToSave:any[]=[],participantsToSave:any[]=[];
   const includeSunday=String(trainingDraft.include_sunday??"false").toLowerCase()==="true";
   const dateObj=(v:string)=>{const [y,m,d]=String(v).split("-").map(Number);return new Date(Date.UTC(y,m-1,d,12));};
