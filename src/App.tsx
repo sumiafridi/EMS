@@ -118,21 +118,23 @@ export default function App(){
    const {error}=await supabase.from("data_imports").update({status,summary:{...summary,completed_at:new Date().toISOString()}}).eq("id",importId).eq("district_id",districtId);
    if(error)throw new Error("Import data was saved but its history could not be updated: "+error.message);
   }
-  async function fetchAllDistrictRows(table:string,columns:string,district:string){
-  const data:any[]=[];let count:number|null=null;let offset=0;
+  let districtReadActive=0;const districtReadWaiters:Array<()=>void>=[];
+ async function withDistrictReadSlot<T>(task:()=>Promise<T>):Promise<T>{if(districtReadActive>=3)await new Promise<void>(resolve=>districtReadWaiters.push(resolve));districtReadActive++;try{return await task();}finally{districtReadActive--;districtReadWaiters.shift()?.();}}
+ async function fetchAllDistrictRows(table:string,columns:string,district:string){
+  const data:any[]=[];let count:number|null=null;let offset=0;const pageSize=500;
   while(true){
-   const q=await (supabase as any).from(table).select(columns,{count:"exact"}).eq("district_id",district).order("id",{ascending:true}).range(offset,offset+999);
-   if(q.error)return {data,count,error:q.error};
+   const q=await withDistrictReadSlot(()=> (supabase as any).from(table).select(columns,offset===0?{count:"exact"}:undefined).eq("district_id",district).order("id",{ascending:true}).range(offset,offset+pageSize-1));
+   if(q.error)return {data,count,error:{...q.error,message:table+": "+q.error.message}};
    data.push(...(q.data||[]));count=q.count??count;
-   if((q.data||[]).length<1000)break;
-   offset+=1000;
+   if((q.data||[]).length<pageSize)break;
+   offset+=pageSize;
   }
   return {data,count:count??data.length,error:null};
  }
- async function loadDistrictData(){
+ async function loadDistrictData():Promise<boolean>{
   setNotice("Loading district records from Supabase…");
   const globalSettingsQ=await supabase.from("global_election_settings").select("setting_key,setting_value,is_locked").order("setting_key");
-  if(globalSettingsQ.error){setNotice("Could not load Super Admin settings: "+globalSettingsQ.error.message);return;}
+  if(globalSettingsQ.error){setNotice("Could not load Super Admin settings: "+globalSettingsQ.error.message);return false;}
   setGlobalSettings(globalSettingsQ.data||[]);
   setGlobalSettingsDraft(Object.fromEntries((globalSettingsQ.data||[]).map((r:any)=>[r.setting_key,{value:typeof r.setting_value==="string"?r.setting_value:JSON.stringify(r.setting_value??""),locked:!!r.is_locked}])));
   const [t,c,s,b,a,staffCount,trainerCount,venueCount,ruleCount,planCount,settingsCount,assignmentCount,reserveCount,batchCount,participantCount,attendanceCount,importsQ,issuesQ]=await Promise.all([
@@ -155,7 +157,7 @@ export default function App(){
    fetchAllDistrictRows("data_imports","id,import_type,filename,row_count,status,summary,created_at",districtId),
    fetchAllDistrictRows("import_issues","id,import_id,row_number,severity,entity,message,source_row,created_at",districtId)
   ]);
-  const err=[t.error,c.error,s.error,b.error,a.error,staffCount.error,trainerCount.error,venueCount.error,ruleCount.error,planCount.error,settingsCount.error,assignmentCount.error,reserveCount.error,batchCount.error,participantCount.error,attendanceCount.error,importsQ.error,issuesQ.error].find(Boolean);if(err){setNotice("Could not load district data: "+err.message);return;}
+  const err=[t.error,c.error,s.error,b.error,a.error,staffCount.error,trainerCount.error,venueCount.error,ruleCount.error,planCount.error,settingsCount.error,assignmentCount.error,reserveCount.error,batchCount.error,participantCount.error,attendanceCount.error,importsQ.error,issuesQ.error].find(Boolean);if(err){setNotice("Could not load district data: "+err.message+". No records were deleted; retry refresh after the database settles.");return false;}
   setImportHistory([...(importsQ.data||[])].sort((a:any,b:any)=>String(b.created_at||"").localeCompare(String(a.created_at||""))));setPersistentImportIssues(issuesQ.data||[]);
   setStations((s.data||[]) as StationRow[]);
   setRows((b.data||[]).map(x=>x.source_data as DataRow).filter(Boolean));setBlockRecords(b.data||[]);setAllocationRecords(a.data||[]);setAllocationTargets({});
@@ -163,7 +165,7 @@ export default function App(){
   setStaffRecords(staffCount.data||[]);setRuleRecords(ruleCount.data||[]);setTrainingPlanRecords(planCount.data||[]);
   const generalSettings:Record<string,string>={},trainingSettings:Record<string,string>={};(globalSettingsQ.data||[]).forEach((r:any)=>{const key=String(r.setting_key||""),value=typeof r.setting_value==="string"?r.setting_value:JSON.stringify(r.setting_value??"");if(key.startsWith("training:"))trainingSettings[key.slice(9)]=value;else generalSettings[key]=value;});(settingsCount.data||[]).forEach((r:any)=>{const key=String(r.setting_key||""),value=typeof r.setting_value==="string"?r.setting_value:JSON.stringify(r.setting_value??"");if(key.startsWith("training:"))trainingSettings[key.slice(9)]=value;else generalSettings[key]=value;});(globalSettingsQ.data||[]).filter((r:any)=>r.is_locked).forEach((r:any)=>{const key=String(r.setting_key||""),value=typeof r.setting_value==="string"?r.setting_value:JSON.stringify(r.setting_value??"");if(key.startsWith("training:"))trainingSettings[key.slice(9)]=value;else generalSettings[key]=value;});if(generalSettings["Form-II Right-Side Vertical Instruction"]===undefined)generalSettings["Form-II Right-Side Vertical Instruction"]="";setDistrictSettingKeys((settingsCount.data||[]).map((r:any)=>String(r.setting_key)));setSettingsDraft(generalSettings);setTrainingDraft(trainingSettings);setTrainerRecords(trainerCount.data||[]);setVenueRecords(venueCount.data||[]);setAssignmentRecords(assignmentCount.data||[]);setReserveRecords(reserveCount.data||[]);setBatchRecords(batchCount.data||[]);setParticipantRecords(participantCount.data||[]);setAttendanceRecords(attendanceCount.data||[]);
   setOpsCounts({staff:staffCount.count||0,trainers:trainerCount.count||0,venues:venueCount.count||0,rules:ruleCount.count||0,plans:planCount.count||0,settings:settingsCount.count||0,assignments:assignmentCount.count||0,reserves:reserveCount.count||0,batches:batchCount.count||0,participants:participantCount.count||0,attendance:attendanceCount.count||0});
-  setNotice("Connected to Supabase · "+(activeDistrict?.name||"District")+" data loaded from PostgreSQL.");
+  setNotice("Connected to Supabase · "+(activeDistrict?.name||"District")+" data loaded from PostgreSQL.");return true;
  }
  async function deletePollingStation(st:any){
   if(!confirm("Delete polling station '"+st.name+"'? A station with block allocations or duty assignments cannot be deleted."))return;
@@ -662,7 +664,8 @@ export default function App(){
    if(oldReserve.error)throw new Error("Assignments saved, but previous reserve records could not be archived: "+oldReserve.error.message);
    for(let i=0;i<reserveIds.length;i+=250){const {error}=await supabase.from("reserve_staff").update({reserve_status:"Available"}).in("id",reserveIds.slice(i,i+250));if(error)throw new Error("Assignments saved, but the new reserve pool could not be activated: "+error.message);}
    const unfilled=Math.max(0,demand-generated.length),cross=generated.filter(x=>x.assignment_data.is_cross_tehsil).length;
-   await loadDistrictData();
+   const refreshed=await loadDistrictData();
+   if(!refreshed){setNotice("Duty assignments were saved: "+generated.length.toLocaleString()+" of "+demand.toLocaleString()+" posts assigned. The dashboard refresh timed out, but saved assignments remain in Supabase. Do not click Calculate again; refresh the page after a short wait.");return;}
    setNotice("Duty calculation completed. Assigned "+generated.length.toLocaleString()+" of "+demand.toLocaleString()+" required posts; "+unfilled.toLocaleString()+" remain vacant. Cross-Tehsil assignments: "+cross.toLocaleString()+". Added "+reserveGenerated.length.toLocaleString()+" reserve staff against a "+reserveSummary.reservePercent+"% target of "+reserveSummary.totalReserve.toLocaleString()+". Non-numeric BPS, unavailable, incomplete or gender/Tehsil-mismatched staff were not guessed or assigned.");
   }catch(e){setNotice("Duty calculation stopped: "+(e instanceof Error?e.message:String(e))+". Any earlier committed Draft rows are retained; active assignments are not deleted.");}
   finally{setBusy(false);}
