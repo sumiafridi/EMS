@@ -1230,7 +1230,7 @@ export default function App(){
    if(gi)add([],18);
    let r=add(["FORM-III"]);merge(r,0,12);
    r=add(["[See rule 13 (1)]"]);merge(r,0,12);
-   const titleLines=title.split(/\\r?\n/);titleLines.forEach((line:string)=>{const rr=add([line]);merge(rr,0,12);});
+   const titleLines=title.split(/\r?\n/);titleLines.forEach((line:string)=>{const rr=add([line]);merge(rr,0,12);});
    r=add(["No. & Name of Local Council:",g.number+" - "+g.name+" ("+g.type+")","District:",districtName,"Tehsil:",g.tehsil]);merge(r,1,2);merge(r,3,4);merge(r,5,6);
    const header1=add(["Sr. No.","No. & Name of Polling Station","Rural Electoral Area","Rural Block","Urban Electoral Area","Urban Block","S. No. of voters on electoral roll","Male voters","Female voters","Total voters","Male booths","Female booths","Total booths"]);
    const sts=g.stations||[];
