@@ -1223,14 +1223,14 @@ export default function App(){
   const merges:any[]=[];
   const rowHeights:any[]=[];
   const colWidths=[8,24,18,13,18,13,13,12,12,12,11,11,12];
-  const title=String(settingsDraft["Form title"]||"LIST OF POLLING STATIONS FOR LOCAL COUNCILS\\n(LG BYE ELECTIONS IN KOHAT 2023)").trim();
+  const title=String(settingsDraft["Form title"]||"LIST OF POLLING STATIONS FOR LOCAL COUNCILS\n(LG BYE ELECTIONS IN KOHAT 2023)").trim();
   const add=(cells:any[],height?:number)=>{const r=aoa.length;aoa.push(cells);if(height)rowHeights[r]={hpt:height};return r;};
   const merge=(r:number,c1:number,c2:number)=>merges.push({s:{r,c:c1},e:{r,c:c2}});
   form3VisibleGroups.forEach((g:any,gi:number)=>{
    if(gi)add([],18);
    let r=add(["FORM-III"]);merge(r,0,12);
    r=add(["[See rule 13 (1)]"]);merge(r,0,12);
-   const titleLines=title.split(/\\r?\\n/);titleLines.forEach((line:string)=>{const rr=add([line]);merge(rr,0,12);});
+   const titleLines=title.split(/\\r?\n/);titleLines.forEach((line:string)=>{const rr=add([line]);merge(rr,0,12);});
    r=add(["No. & Name of Local Council:",g.number+" - "+g.name+" ("+g.type+")","District:",districtName,"Tehsil:",g.tehsil]);merge(r,1,2);merge(r,3,4);merge(r,5,6);
    const header1=add(["Sr. No.","No. & Name of Polling Station","Rural Electoral Area","Rural Block","Urban Electoral Area","Urban Block","S. No. of voters on electoral roll","Male voters","Female voters","Total voters","Male booths","Female booths","Total booths"]);
    const sts=g.stations||[];
